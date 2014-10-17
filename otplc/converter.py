@@ -4,8 +4,10 @@ Transform a OTPL file to and from brat annotations.
 from itertools import count
 from logging import getLogger
 from collections import defaultdict
+import os
 from re import compile
 from os.path import exists, splitext, dirname, join
+from otplc import brat
 from otplc.colspec import ColumnSpecification
 from otplc.reader import guess_colspec, configure_reader, DataFormatError
 from otplc.settings import Configuration
@@ -118,17 +120,17 @@ class OtplBratConverter:
         """ Write the annotation.conf file in the given location. """
         with open(file_path, 'wb') as self._config_file:
             if self._entities:
-                self._writeConfigFor(u'entities', self._entities.items(), self._writeEntity)
+                self._writeConfigFor(u'entities', self._entities.items(), self._writeEntityType)
 
             if self._relations:
-                self._writeConfigFor(u'relations', self._relations.items(), self._writeRelation)
+                self._writeConfigFor(u'relations', self._relations.items(), self._writeRelationType)
 
             if self._events:
-                self._writeConfigFor(u'events', self._events.items(), self._writeEvent)
+                self._writeConfigFor(u'events', self._events.items(), self._writeEventType)
 
             if self._attributes:
                 self._writeConfigFor(u'attributes', self._attributes.items(),
-                                     self._writeAttribute)
+                                     self._writeAttributeType)
 
             if self._normalizations:
                 self._storeDatabaseNames()
@@ -312,14 +314,7 @@ class OtplBratConverter:
         if name not in self._entities:
             self._entities[name] = None
 
-        self._storeAnnotation(
-            u'%s\t%s %d %d\t%s\n' %
-            (uid,
-             name,
-             start,
-             end,
-             self._text[
-                 start:end]))
+        self._storeAnnotation(brat.Entity(uid, name, start, end, self._text[start:end]))
 
     def _makeNormalization(self, data, row_num, col):
         ns_id = data[col]
@@ -342,7 +337,7 @@ class OtplBratConverter:
                 return
 
             self._normalizations.add(name)  # namespace only
-            self._storeAnnotation(u'%s\tReference %s %s\t%s\n' % (uid, target_id, ns_id, string))
+            self._storeAnnotation(brat.Normalization(uid, u'Reference', target_id, ns_id, string))
 
     def _makeRelation(self, data, row_num, col):
         name = data[col]
@@ -360,7 +355,7 @@ class OtplBratConverter:
             source_id = self._getLocalTargetID(source_col, data, row_num)
             target_id = self._getReferencedID(data, ref_col)
             self._relations[name].add(col)
-            self._storeAnnotation(u"%s\t%s Arg1:%s Arg2:%s\n" % (uid, name, source_id, target_id))
+            self._storeAnnotation(brat.Relation(uid, name, source_id, target_id))
 
     def _makeEvent(self, data, row_num, col):
         name = data[col]
@@ -380,7 +375,7 @@ class OtplBratConverter:
             references = [u"Arg%d:%s" % (num, rid)
                           for num, rid in enumerate(ref_ids, 1) if rid is not None]
             self._storeEventArguments(name, zip(ref_cols, [i is not None for i in ref_ids]))
-            self._storeAnnotation(u"%s\t%s:%s %s" % (uid, name, trigger_id, u' '.join(references)))
+            self._storeAnnotation(brat.Event(uid, name, trigger_id, references))
 
     def _storeEventArguments(self, name, col_req_pairs):
         if name in self._events:
@@ -415,10 +410,11 @@ class OtplBratConverter:
             mods, cols = self._attributes[name]
             mods.add(modifier.rstrip(u' ') if modifier else True)
             cols.add(col)
-            self._storeAnnotation(u"%s\t%s %s%s" % (uid, name, target, modifier))
+            self._storeAnnotation(brat.Attribute(uid, name, target, modifier))
 
-    def _storeAnnotation(self, string):
-        self._annotation_file.write(string.encode('utf-8'))
+    def _storeAnnotation(self, ann):
+        self._annotation_file.write(str(ann))
+        self._annotation_file.write(os.linesep)
 
     def _register(self, col, letter, counter, num, *data_items):
         uid = letter + str(counter.next())  # the uid for this brat annotation
@@ -478,11 +474,11 @@ class OtplBratConverter:
         for name, data in sorted(collection):
             writeConfig(name, data)
 
-    def _writeEntity(self, name, unused):
+    def _writeEntityType(self, name, unused):
         """ Write the entity name, None pair to the configuration file. """
         self._storeConfiguration(u'%s\n' % name)
 
-    def _writeRelation(self, name, columns):
+    def _writeRelationType(self, name, columns):
         """ Write the relation name, columns pair to the configuration file. """
         self._storeConfiguration(u'%s\t' % name)
 
@@ -494,7 +490,7 @@ class OtplBratConverter:
         )
         self._storeConfiguration(u'Arg1:%s, Arg2:%s\n' % (target1, target2))
 
-    def _writeEvent(self, name, pairs):
+    def _writeEventType(self, name, pairs):
         """ Write the event name, pairs pair to the configuration file. """
         self._storeConfiguration(u'%s\t' % name)
         arguments = []
@@ -508,7 +504,7 @@ class OtplBratConverter:
         self._storeConfiguration(u', '.join(arguments))
         self._storeConfiguration(u'\n')
 
-    def _writeAttribute(self, name, values):
+    def _writeAttributeType(self, name, values):
         """ Write the attribute name, values pair to the configuration file. """
         modifiers = u'' if len(values[0]) == 1 else u', Value:%s' % u'|'.join(values[0])
         shortcut = self._elicitShortcutFor(values[1], self._colspec.get_attribute_target)
