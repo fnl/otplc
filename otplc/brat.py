@@ -221,14 +221,14 @@ class Attribute(_Annotation):
 
 
 _PARSE = {
-    u'T': Entity.from_string,
-    u'R': Relation.from_string,
-    u'E': Event.from_string,
-    u'N': Normalization.from_string,
-    u'M': Attribute.from_string,
-    u'A': Attribute.from_string,
-    u'#': Note.from_string,
-    u'*': Equiv.from_string,
+    'T': Entity.from_string,
+    'R': Relation.from_string,
+    'E': Event.from_string,
+    'N': Normalization.from_string,
+    'M': Attribute.from_string,
+    'A': Attribute.from_string,
+    '#': Note.from_string,
+    '*': Equiv.from_string,
 }
 
 _ERROR_MSG = u'%s on line %d in %s: "%s"'
@@ -248,7 +248,11 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
     :return: a generator for :class:`_Annotation` instances
     :raises IOError: if there is a "technical" problem opening/reading the file
     """
-    skip = (lambda l: False) if filter is None else (lambda l: filter.search(l.decode('utf-8')))
+    skip = (
+        lambda l: False
+    ) if filter is None else (
+        lambda l: filter.search(l.decode('utf-8'))
+    )
 
     with open(file_path, mode=mode, **open_args) as file:
         for lno, line in enumerate(file, 1):
@@ -256,25 +260,27 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
 
             if line and not skip(line):
                 annotation = line[0]
+                error_args = (lno, file_path, line.decode('utf-8'))
 
                 try:
                     # noinspection PyCallingNonCallable
                     yield _PARSE[annotation](line)
                 except ValueError:
-                    L.error(_ERROR_MSG, u'format error', lno, file_path, line)
+                    L.error(_ERROR_MSG, u'format error', *error_args)
                     if strict:
                         raise
                 except TypeError:
-                    L.error(_ERROR_MSG, u'illegal attribute type', lno, file_path, line)
+                    L.error(_ERROR_MSG, u'illegal attribute type',
+                            lno, file_path, line.decode('utf-8'))
                     if strict:
                         raise
                 except KeyError:
-                    L.error(_ERROR_MSG, u"unknown annotation '%s'" % annotation,
-                            lno, file_path, line)
+                    desc = u"unknown annotation '%s'" % annotation.decode('utf-8')
+                    L.error(_ERROR_MSG, desc, *error_args)
                     if strict:
                         raise
                 except Exception:
-                    L.exception(_ERROR_MSG, u'unexpected error', lno, file_path, line)
+                    L.exception(_ERROR_MSG, u'unexpected error', *error_args)
                     if strict:
                         raise
 
