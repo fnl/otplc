@@ -238,7 +238,7 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
     """
     Yield annotation instances by parse a brat annotation file.
 
-    Any lines that cannot be parsed are normally skipped (see `strict`).
+    Any lines that cannot be parsed are skipped (see `strict`).
 
     :param file_path: the file to read
     :param filter: a compiled regex pattern; any input line that matches is skipped
@@ -269,7 +269,8 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
                     if strict:
                         raise
                 except KeyError:
-                    L.error(_ERROR_MSG, u'unknown annotation', lno, file_path, line)
+                    L.error(_ERROR_MSG, u"unknown annotation '%s'" % annotation,
+                            lno, file_path, line)
                     if strict:
                         raise
                 except Exception:
