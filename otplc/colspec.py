@@ -3,7 +3,7 @@ OTPL files must match the following specifications:
 
 Segments (usually, sentences) must be separated by *empty* lines (containing no character at all).
 Each row must have the same number of columns (except empty-line segment separators).
-Linebreaks may be encoded as either ``\\n`` (UNIX) or ``\\r\\n` (Windows).
+Linebreaks may be encoded as either ``\\n`` (UNIX) or ``\\r\\n`` (Windows).
 The first line and segment (i.e., terminated by two line-breaks) can be a column specification
 (colspec; see below).
 Inline comments are not allowed; please prune your data first.
