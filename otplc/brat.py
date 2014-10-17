@@ -6,6 +6,7 @@ And all types can be transformed to Unicode strings (:func:`unicode`) or be seri
 strings (:func:`str`) in UTF-8 encoding.
 """
 from logging import getLogger
+import os
 
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
@@ -282,4 +283,5 @@ def write(file_path, annotations, mode='wb', **open_args):
     if annotations:
         with open(file_path, mode=mode, **open_args) as file:
             for ann in annotations:
-                file.write('%s\n' % str(ann))
+                file.write(str(ann))
+                file.write(os.linesep)
