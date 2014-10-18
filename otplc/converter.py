@@ -1,10 +1,10 @@
 """
 Transform a OTPL file to and from brat annotations.
 """
+import os
 from itertools import count
 from logging import getLogger
 from collections import defaultdict
-import os
 from re import compile
 from os.path import exists, splitext, dirname, join
 from otplc import brat
@@ -110,7 +110,7 @@ class OtplBratConverter:
                 self._convertWithGlobals(segments, brat_file)
             else:
                 self._convertLocal(segments, brat_file)
-        except Exception as e:
+        except (ValueError, DataFormatError) as e:
             L.warning(u'failed - %s', e.message)
             return False
 
@@ -328,16 +328,16 @@ class OtplBratConverter:
             if u' ' in ns_id:
                 ns_id, string = ns_id.split(u' ', 1)
 
-            name = ns_id.split(u':', 1)[0]
+            db, xref = ns_id.split(u':', 1)
 
             try:
-                self._validateName(name)
+                self._validateName(db)
             except DataFormatError:
-                L.error(u'brat cannot cope with database name "%s" in column %d', name, col + 1)
+                L.error(u'brat cannot cope with DB name "%s" in column %d', db, col + 1)
                 return
 
-            self._normalizations.add(name)  # namespace only
-            self._storeAnnotation(brat.Normalization(uid, u'Reference', target_id, ns_id, string))
+            self._normalizations.add(db)  # DB namespace only
+            self._storeAnnotation(brat.Normalization(uid, target_id, db, xref, string))
 
     def _makeRelation(self, data, row_num, col):
         name = data[col]
@@ -372,10 +372,10 @@ class OtplBratConverter:
             trigger_id = self._getReferencedID(data, trigger_col)
             ref_ids = [None if data[c] == u'0' else self._getReferencedID(data, c)
                        for c in ref_cols]
-            references = [u"Arg%d:%s" % (num, rid)
-                          for num, rid in enumerate(ref_ids, 1) if rid is not None]
+            references = dict((u'Arg%d' % num, rid)
+                              for num, rid in enumerate(ref_ids, 1) if rid is not None)
             self._storeEventArguments(name, zip(ref_cols, [i is not None for i in ref_ids]))
-            self._storeAnnotation(brat.Event(uid, name, trigger_id, references))
+            self._storeAnnotation(brat.Event(uid, name, trigger_id, **references))
 
     def _storeEventArguments(self, name, col_req_pairs):
         if name in self._events:

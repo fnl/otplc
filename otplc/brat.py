@@ -21,17 +21,28 @@ class _Annotation(object):
 
     @classmethod
     def _parse(cls, line):
-        """uid``\\t``name`` ``..."""
+        """
+        uid``\\t``name`` ``...
+
+        Uniform annotation de-serialization.
+        """
         uid, rest = line.decode('utf-8').split(u'\t', 1)
         name, rest = rest.split(u' ', 1)
         return uid, name, rest
 
     def __init__(self, uid, name):
-        self.uid = uid
-        self.name = name
+        self.uid = unicode(uid)
+        self.name = unicode(name)
 
     def __str__(self):
+        """Uniform annotation serialization."""
         return unicode(self).encode('utf-8')
+
+    def __eq__(self, other):
+        return vars(self) == vars(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 class _Text(_Annotation):
@@ -49,13 +60,14 @@ class _Text(_Annotation):
 
     def __init__(self, uid, name, text):
         super(_Text, self).__init__(uid, name)
-        self.text = text
-
+        self.text = unicode(text)
 
 class _Association(_Annotation):
 
     """
     All association types in addition to ``uid`` and ``name`` have an ``args`` attribute.
+
+    These arguments are dictionaries holding argument type to target ID mappings.
     """
 
     @classmethod
@@ -64,9 +76,14 @@ class _Association(_Annotation):
         uid, name, rest = super(_Association, cls)._parse(line)
         return uid, name, tuple(rest.split(u' '))
 
-    def __init__(self, uid, name, args):
+    def __init__(self, uid, name, **args):
         super(_Association, self).__init__(uid, name)
-        self.args = args
+        args = args['args'] if len(args) == 1 and 'args' in args else args
+        self.args = dict((arg, unicode(target)) for arg, target in args.items())
+
+    @property
+    def _args_unicode(self):
+        return u' '.join(u'%s:%s' % (arg, target) for arg, target in self.args.items())
 
 
 class Entity(_Text):
@@ -86,10 +103,13 @@ class Entity(_Text):
         super(Entity, self).__init__(uid, name, text)
         self.start = int(start)
         self.end = int(end)
+        assert len(text) == self.end - self.start, 'text and offsets mismatch'
 
     def __unicode__(self):
         return u"%s\t%s %d %d\t%s" % (self.uid, self.name, self.start, self.end, self.text)
 
+    def __eq__(self, other):
+        return isinstance(other, Entity) and super(Entity, self).__eq__(other)
 
 class Normalization(_Text):
 
@@ -99,18 +119,28 @@ class Normalization(_Text):
 
     @classmethod
     def from_string(cls, line):
-        """uid``\\t``name`` ``target`` ``ref``\\t``text"""
+        """uid``\\tReference ``target`` ``db``:``xref``\\t``text"""
         uid, name, target_ref, text = super(Normalization, cls)._parse(line)
-        target, xref = target_ref.split(u' ', 1)
-        return Normalization(uid, name, target, xref, text)
 
-    def __init__(self, uid, name, target, xref, text=None):
-        super(Normalization, self).__init__(uid, name, text if text else xref)
-        self.xref = xref
-        self.target = target
+        if name != u'Reference':
+            raise ValueError('illegal normalization name="%s"' % name)
+
+        target, xref = target_ref.split(u' ', 1)
+        db, xref = xref.split(u':', 1)
+        return Normalization(uid, target, db, xref, text)
+
+    def __init__(self, uid, target, db, xref, text=None):
+        super(Normalization, self).__init__(uid, u'Reference', text if text else xref)
+        self.db = unicode(db)
+        self.xref = unicode(xref)
+        self.target = unicode(target)
 
     def __unicode__(self):
-        return u"%s\t%s %s %s\t%s" % (self.uid, self.name, self.target, self.xref, self.text)
+        return u"%s\tReference %s %s:%s\t%s" % (self.uid, self.target,
+                                                self.db, self.xref, self.text)
+
+    def __eq__(self, other):
+        return isinstance(other, Normalization) and super(Normalization, self).__eq__(other)
 
 
 class Note(_Text):
@@ -126,10 +156,13 @@ class Note(_Text):
 
     def __init__(self, uid, name, target, text):
         super(Note, self).__init__(uid, name, text)
-        self.target = target
+        self.target = unicode(target)
 
     def __unicode__(self):
         return u"%s\t%s %s\t%s" % (self.uid, self.name, self.target, self.text)
+
+    def __eq__(self, other):
+        return isinstance(other, Note) and super(Note, self).__eq__(other)
 
 
 class Relation(_Association):
@@ -137,48 +170,58 @@ class Relation(_Association):
     """
     An association type with exactly two (entity or association) ``args``.
 
-    The ``"Arg1:"`` and ``"Arg2:"`` prefixes do not have to be provided;
-    If these argument type specifiers are missing, they are automatically prepended.
+    The ``"Arg1:"`` and ``"Arg2:"`` prefixes do not have to be part of `target1` and `target2`;
+    The argument type specifiers are automatically prepended.
+    If any other prefixes are used, they are removed.
     """
 
     @classmethod
     def from_string(cls, line):
-        """uid``\\t``name`` ``arg1`` ``arg2"""
+        """uid``\\t``name`` Arg1:``target1`` Arg2:``target2"""
         uid, name, args = super(Relation, cls)._parse(line)
-        arg1, arg2 = args  # ensure there's two and only two args
-        return Relation(uid, name, arg1, arg2)
+        target1, target2 = args  # ensure there's two and only two args
+        return Relation(uid, name, target1, target2)
 
-    def __init__(self, uid, name, arg1, arg2):
-        arg1 = arg1 if u':' in arg1 else u'Arg1:%s' % arg1
-        arg2 = arg2 if u':' in arg2 else u'Arg2:%s' % arg2
-        super(Relation, self).__init__(uid, name, (arg1, arg2))
+    def __init__(self, uid, name, target1, target2):
+        target1 = target1[target1.find(u':') + 1:]
+        target2 = target2[target2.find(u':') + 1:]
+        super(Relation, self).__init__(uid, name, Arg1=target1, Arg2=target2)
 
     def __unicode__(self):
-        return u"%s\t%s %s %s" % (self.uid, self.name, self.args[0], self.args[1])
+        return u"%s\t%s %s" % (self.uid, self.name, self._args_unicode)
+
+    def __eq__(self, other):
+        return isinstance(other, Relation) and super(Relation, self).__eq__(other)
 
 
 class Event(_Association):
 
     """
     An association type with an (entity) ``trigger``.
+
+    Arguments should be argument type, target pairs, like {Argument=u'T2')
     """
 
     @classmethod
     def from_string(cls, line):
-        """uid``\\t``name:trigger[`` ``arg]+"""
+        """uid``\\t``name:trigger[`` ``arg``:``target]+"""
         uid, named_trigger, args = super(Event, cls)._parse(line)
         name, trigger = named_trigger.split(u':', 1)
-        return Event(uid, name, trigger, args)
+        args = dict(a_t.split(u':') for a_t in args)
+        return Event(uid, name, trigger, **args)
 
-    def __init__(self, uid, name, trigger, args):
-        super(Event, self).__init__(uid, name, args)
-        self.trigger = trigger
+    def __init__(self, uid, name, trigger, **args):
+        super(Event, self).__init__(uid, name, **args)
+        self.trigger = unicode(trigger)
 
     def __unicode__(self):
-        return u"%s\t%s:%s %s" % (self.uid, self.name, self.trigger, ' '.join(self.args))
+        return u"%s\t%s:%s %s" % (self.uid, self.name, self.trigger, self._args_unicode)
+
+    def __eq__(self, other):
+        return isinstance(other, Event) and super(Event, self).__eq__(other)
 
 
-class Equiv(_Association):
+class Equiv(_Annotation):
 
     """
     A plain association type.
@@ -186,14 +229,19 @@ class Equiv(_Association):
 
     @classmethod
     def from_string(cls, line):
-        """uid``\\t``name[`` ``arg]+"""
-        return Equiv(*super(Equiv, cls)._parse(line))
+        """uid``\\t``name[`` ``target]+"""
+        uid, name, rest = super(Equiv, cls)._parse(line)
+        return Equiv(uid, name, rest.split())
 
-    def __init__(self, uid, name, args):
-        super(Equiv, self).__init__(uid, name, args)
+    def __init__(self, uid, name, targets):
+        super(Equiv, self).__init__(uid, name)
+        self.targets = tuple(targets)
 
     def __unicode__(self):
-        return u"%s\t%s %s" % (self.uid, self.name, ' '.join(self.args))
+        return u"%s\t%s %s" % (self.uid, self.name, u' '.join(self.targets))
+
+    def __eq__(self, other):
+        return isinstance(other, Equiv) and super(Equiv, self).__eq__(other)
 
 
 class Attribute(_Annotation):
@@ -213,25 +261,34 @@ class Attribute(_Annotation):
     def __init__(self, uid, name, target, modifier=None):
         super(Attribute, self).__init__(uid, name)
         self.target = target
-        self.value = modifier
+        self.modifier = modifier
 
     def __unicode__(self):
-        value = u' %s' % self.value if self.value else ''
+        value = u' %s' % self.modifier if self.modifier else ''
         return u"%s\t%s %s%s" % (self.uid, self.name, self.target, value)
+
+    def __eq__(self, other):
+        return isinstance(other, Attribute) and super(Attribute, self).__eq__(other)
 
 
 _PARSE = {
     'T': Entity.from_string,
+    'N': Normalization.from_string,
+    '#': Note.from_string,
     'R': Relation.from_string,
     'E': Event.from_string,
-    'N': Normalization.from_string,
-    'M': Attribute.from_string,
-    'A': Attribute.from_string,
-    '#': Note.from_string,
     '*': Equiv.from_string,
+    'A': Attribute.from_string,
+    'M': Attribute.from_string,  # legacy support (is this still needed?)
 }
 
 _ERROR_MSG = u'%s on line %d in %s: "%s"'
+
+_ERROR_REASON = {
+    ValueError: u'format error',
+    TypeError: u'illegal attribute type',
+    KeyError: u'unknown annotation',
+}
 
 
 def read(file_path, filter=None, strict=False, mode='rU', **open_args):
@@ -248,41 +305,36 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
     :return: a generator for :class:`_Annotation` instances
     :raises IOError: if there is a "technical" problem opening/reading the file
     """
-    skip = (
-        lambda l: False
-    ) if filter is None else (
-        lambda l: filter.search(l.decode('utf-8'))
-    )
+    skip = _makeFilterFunction(filter)
 
     with open(file_path, mode=mode, **open_args) as file:
-        for lno, line in enumerate(file, 1):
-            line = line.strip()
+        for lno, bytes in enumerate(file, 1):
+            bytes = bytes.strip()
 
-            if line and not skip(line):
-                annotation = line[0]
-                error_args = (lno, file_path, line.decode('utf-8'))
+            if bytes and not skip(bytes):
+                annotation = bytes[0]
 
                 try:
                     # noinspection PyCallingNonCallable
-                    yield _PARSE[annotation](line)
-                except ValueError:
-                    L.error(_ERROR_MSG, u'format error', *error_args)
+                    yield _PARSE[annotation](bytes)
+                except (ValueError, TypeError, KeyError, Exception) as error:
+                    error_args = (lno, file_path, bytes.decode('utf-8'))
+
+                    try:
+                        L.error(_ERROR_MSG, _ERROR_REASON[type(error)], *error_args)
+                    except KeyError:
+                        L.error(_ERROR_MSG, error.message, *error_args)
+
                     if strict:
-                        raise
-                except TypeError:
-                    L.error(_ERROR_MSG, u'illegal attribute type',
-                            lno, file_path, line.decode('utf-8'))
-                    if strict:
-                        raise
-                except KeyError:
-                    desc = u"unknown annotation '%s'" % annotation.decode('utf-8')
-                    L.error(_ERROR_MSG, desc, *error_args)
-                    if strict:
-                        raise
-                except Exception:
-                    L.exception(_ERROR_MSG, u'unexpected error', *error_args)
-                    if strict:
-                        raise
+                        raise error
+
+
+def _makeFilterFunction(filter):
+    return (
+        lambda b: False
+    ) if filter is None else (
+        lambda b: filter.search(b.decode('utf-8'))
+    )
 
 
 def write(file_path, annotations, mode='wb', **open_args):
