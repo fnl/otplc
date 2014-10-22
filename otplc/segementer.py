@@ -12,38 +12,42 @@ A pattern-based sentence segmentation strategy; Known limitations:
 The decision for requiring an "syntactically correct" terminal sequence with upper-case letters or
 numbers as start symbol is based on the preference to under-split rather than over-split sentences.
 
-Special care is taken not to split at common abbreviations "i.e.", "etc.",
+Special care is taken not to split at common abbreviations like "i.e." or "etc.",
 to not split at first or middle name initials "... F. M. Last ...",
+to not split before a comma, colon, or semi-colon,
 and to avoid single letters or digits as sentences ("A. This sentence...").
 
-Sentence splits will always be enforced at either single or double line-breaks.
+Sentence splits will always be enforced at [consecutive] line separators.
+
+*Important*: Windows uses ``\\r\\n`` as line split; use consecutive splits for single line splits
+and the special windows function for multi-line splits.
 """
-import os
 from regex import compile, DOTALL, VERBOSE, UNICODE
 
-try:
-    from otplc.tokenizer import LINEBREAK, SENTENCE_TERMINALS
-except ImportError:
-    # to use this on the command line
-    from tokenizer import LINEBREAK, SENTENCE_TERMINALS
 
-# Use upper-case for abbreviations that are all capitals without intervening dots.
+__author__ = 'Florian Leitner <florian.leitner@gmail.com>'
+
+SENTENCE_TERMINALS = u'.!?\u203C\u203D\u2047\u2047\u2049\u3002' \
+                     u'\uFE52\uFE57\uFF01\uFF0E\uFF1F\uFF61'
+"""The list of valid Unicode sentence terminal characters."""
+
+# Use upper-case for abbreviations that always are capitalized:
 # Lower-case abbreviations may occur capitalized or not.
-# Repeat-dot abbrevations (like Dr.med.univ. or i.e.) are auto-detected.
-ABBREVIATIONS = u"""AB abbrev AC acad AD al alt AM approx apr asap assn assoc aug ave
+# Abbreviations with intervening dots (like U.S.A., Dr.med.univ., or i.e.) are auto-detected.
+ABBREVIATIONS = u"""AB abbrev AC acad AD al alt AM approx apr asap asf assn assoc aug ave
 BA BC BRA BS btw capt cent co col comdr corp cpl DC dec dept DF dist div dr ed est et etc
 feb fl fig figs gal gen gov grad hon hr inc inst jan jr jun jul lat lb lib long lt ltd
 mag mar med MD min mr mrs ms msgr mt mts mus nat nov nr oct op oz pl pop PRC prof pseud pt pub
 rer rev sep sept ser sgt sr sra st univ US USA USSR vol vs wt""".split()
 ABBREVIATIONS.extend(a.capitalize() for a in ABBREVIATIONS if a[0].islower())
 ABBREVIATIONS = u'|'.join(sorted(ABBREVIATIONS))
-ABBREVIATIONS = compile(ur'.*?(?:\b(?:%s)|\w+\.\w+)$' % ABBREVIATIONS, UNICODE)
+ABBREVIATIONS = compile(ur'(?:\b(?:%s)|\w+\.\w+)$' % ABBREVIATIONS, UNICODE)
+"A pattern to detect common abbreviations at the candidate sentence end."
 
-LB_PATTERN = compile(LINEBREAK, UNICODE)
-
-NAME_ABBREV = compile(ur'^.*?\b[A-Z][A-z]?$', UNICODE)  # including two-letter abbreviations
-# Last name or single-letter middle name abbreviation; Aj. B. McArthur
-LAST_NAME = compile(ur'^(?:(?:[A-Z][a-z]+){1,2}|[A-Z]$)', UNICODE)
+NAME_ABBREV = compile(ur'\b\p{{Lu}}\p{{L}}?$', UNICODE)
+"A pattern to detect one upper-case letter and an optional letter before the candidate end."
+LAST_NAME = compile(ur'^(?:(?:\p{{Lu}}[\p{{Ll}}\p{{Lm}}]+){1,2}|\p{{Lu}}$)', UNICODE)
+"A pattern to detect capitalized first words or single upper-case letter segments."
 
 SEGMENTER_REGEX = (
     ur'('   # A sentence ends at one of two sequences:
@@ -68,17 +72,23 @@ and a left bracket and/or quote may precede the alphanumeric.
 Alternatively, an yet undefined number of line-breaks also may terminate sentences.
 """
 
+_compile = lambda cnt: compile(SEGMENTER_REGEX.format(u'{%d,}' % cnt), DOTALL | VERBOSE | UNICODE)
+
 # Define that one or more line-breaks split sentences:
-DO_NOT_CROSS_LINES = compile(SEGMENTER_REGEX.format(u'+'), DOTALL | VERBOSE | UNICODE)
+DO_NOT_CROSS_LINES = _compile(1)
 "A pattern where any newline (CR, NL/LF, or LS) terminates a sentence."
+
 # Define that two or more line-breaks split sentences:
-MAY_CROSS_ONE_LINE = compile(SEGMENTER_REGEX.format(u'{2,}'), DOTALL | VERBOSE | UNICODE)
+MAY_CROSS_ONE_LINE = _compile(2)
 "A pattern where two or more successive newlines (CR, NL/LF, or LS) terminate sentences."
 
+WINDOW_LINEBREAK_X = _compile(4)
+"A pattern for the Windows line-break format."
 
-def regex_segmenter(text):
+
+def split_single(text):
     """
-    Split sentences that never cross lines.
+    Split at sentences terminals and at line separator chars.
 
     :param text: input plain-text
     :return: a sentence generator with inner linebreaks replaced with spaces
@@ -86,9 +96,9 @@ def regex_segmenter(text):
     return _sentences(DO_NOT_CROSS_LINES.split(text))
 
 
-def multiline_segmenter(text):
+def split_multi(text):
     """
-    Split sentences that may cross newlines, except consecutive ones.
+    Split sentences that may contain non-consecutive line separator chars.
 
     :param text: input plain-text
     :return: a sentence generator with inner linebreaks replaced with spaces
@@ -96,9 +106,19 @@ def multiline_segmenter(text):
     return _sentences(MAY_CROSS_ONE_LINE.split(text))
 
 
-def single_segmenter(text):
+def split_windows(text):
     """
-    Split at newlines (``\n''), but only return lines with content.
+    Split sentences that may contain non-consecutive line separator chars.
+
+    :param text: input plain-text with **Windows** line-break format ``\\r\\n``
+    :return: a sentence generator with inner linebreaks replaced with spaces
+    """
+    return _sentences(WINDOW_LINEBREAK_X.split(text))
+
+def split_newline(text):
+    """
+    Split the `text` at newlines (``\\n'') and strip the lines,
+    but only return lines with content.
 
     :param text: input plain-text
     :return: a "sentence" generator (lines with [stripped] content)
@@ -110,9 +130,9 @@ def single_segmenter(text):
             yield line
 
 
-def rewrite_newlines(text, pattern):
+def rewrite_line_separators(text, pattern):
     """
-    Remove newlines (CR, LF/NL, LS) inside sentences and ensure there is a ``\\n`` at their end.
+    Remove line separator chars inside sentences and ensure there is a ``\\n`` at their end.
 
     :param text: input plain-text
     :param pattern: for the initial sentence splitting
@@ -126,7 +146,8 @@ def rewrite_newlines(text, pattern):
         intervening = text[offset:start]
 
         if offset != 0 and u'\n' not in intervening:
-            intervening = '\n' + intervening[1:]
+            yield '\n'
+            intervening = intervening[1:]
 
         yield intervening
         yield sentence
@@ -143,8 +164,8 @@ def _sentences(spans):
     i = -2
     lookAhead = lambda: spans[i + 1] if len(spans) > i + 1 else u''
     isAbbrev = lambda: (terminal[0] == u'.' and
-                        (ABBREVIATIONS.match(segment) or
-                         (NAME_ABBREV.match(segment) and LAST_NAME.match(lookAhead()))))
+                        (ABBREVIATIONS.search(segment) or
+                         (NAME_ABBREV.search(segment) and LAST_NAME.match(lookAhead()))))
     isSingleAlnum = lambda: len(segment) == 1 and segment.isalnum()
 
     for i, terminal in enumerate(spans):
@@ -184,5 +205,5 @@ if __name__ == '__main__':
     for txt_file_path in argv[1:]:
         text = open(txt_file_path, 'rt').read().decode('UTF-8')
 
-        for span in rewrite_newlines(text, MAY_CROSS_ONE_LINE):
+        for span in rewrite_line_separators(text, MAY_CROSS_ONE_LINE):
             stdout.write(span.encode('utf-8'))

@@ -6,6 +6,8 @@ If a text contains such characters, normalize it first.
 """
 from HTMLParser import HTMLParser
 from regex import compile, UNICODE, VERBOSE
+from otplc.segementer import SENTENCE_TERMINALS
+
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
 
@@ -51,10 +53,6 @@ a single line-break surrounded by optional (non-breaking) spaces,
 and terminates with a alphanumeric character on this next line.
 The opening char and hyphen as well as the terminating char are captured in two groups.
 """
-
-SENTENCE_TERMINALS = u'.!?\u203C\u203D\u2047\u2047\u2049\u3002' \
-                     u'\uFE52\uFE57\uFF01\uFF0E\uFF1F\uFF61'
-"""A list of valid sentence terminal characters."""
 
 
 def matches(regex):

@@ -1,13 +1,7 @@
-"""
-.. py:module:: 
-   :synopsis: 
-
-.. moduleauthor:: Florian Leitner <florian.leitner@gmail.com>
-.. License: GNU Affero GPL v3 (http://www.gnu.org/licenses/agpl.html)
-"""
+# coding=utf-8
 from unittest import TestCase
-from otplc.segementer import regex_segmenter, multiline_segmenter, MAY_CROSS_ONE_LINE, \
-    single_segmenter, rewrite_newlines
+from otplc.segementer import split_single, split_multi, MAY_CROSS_ONE_LINE, \
+    split_newline, rewrite_line_separators
 
 
 OSPL = u"""One sentence per line.
@@ -51,31 +45,31 @@ class TestSentenceSegmenter(TestCase):
         self.maxDiff = None
 
     def test_simple(self):
-        self.assertEqual([u'This is a test.'], list(regex_segmenter(u"This is a test.")))
+        self.assertEqual([u'This is a test.'], list(split_single(u"This is a test.")))
 
     def test_regex(self):
-        self.assertSequenceEqual(SENTENCES, list(regex_segmenter(TEXT)))
+        self.assertSequenceEqual(SENTENCES, list(split_single(TEXT)))
 
     def test_names(self):
         text = u"A. Wright, these are Aj. B. McArthur and D. Eden. B. Boyden is over there."
         sentences = [u"A. Wright, these are Aj. B. McArthur and D. Eden.",
                      u"B. Boyden is over there."]
-        self.assertSequenceEqual(sentences, list(regex_segmenter(text)))
+        self.assertSequenceEqual(sentences, list(split_single(text)))
 
     def test_multiline(self):
         text = u"This is a\nmultiline sentence. And this is Mr.\nAbbrevation."
         ml_sentences = [u"This is a multiline sentence.", u"And this is Mr. Abbrevation."]
-        self.assertSequenceEqual(ml_sentences, list(multiline_segmenter(text)))
+        self.assertSequenceEqual(ml_sentences, list(split_multi(text)))
 
     def test_linebreak(self):
         text = u"This is a\nmultiline sentence."
         rx_sentences = text.split('\n')
-        self.assertSequenceEqual(rx_sentences, list(regex_segmenter(text)))
+        self.assertSequenceEqual(rx_sentences, list(split_single(text)))
 
     def test_single(self):
-        self.assertSequenceEqual(SENTENCES, list(single_segmenter(OSPL)))
+        self.assertSequenceEqual(SENTENCES, list(split_newline(OSPL)))
 
     def test_rewrite(self):
         # noinspection PyTypeChecker
         extreme = OSPL.replace(u'\n', u'\u2028').replace(u' ', u'\n')
-        self.assertSequenceEqual(OSPL, u''.join(rewrite_newlines(extreme, MAY_CROSS_ONE_LINE)))
+        self.assertSequenceEqual(OSPL, u''.join(rewrite_line_separators(extreme, MAY_CROSS_ONE_LINE)))
