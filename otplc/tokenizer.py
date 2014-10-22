@@ -150,28 +150,28 @@ def word_tokenizer(sentence):
               token in word_tokenizer.split(span) if token]
 
     # splice the sentence terminal off the last word/token if it has any at its borders
-    for idx, word in enumerate(reversed(tokens), 1):
+    # only look for the sentence terminal in the last three tokens
+    for idx, word in enumerate(reversed(tokens[-3:]), 1):
         if (word_tokenizer.match(word) and not APO_MATCHER.match(word)) or \
                 any(t in word for t in SENTENCE_TERMINALS):
             last = len(word) - 1
 
-            if not last or (last == 2 and word == u'...'):
-                # ".", "_", or "..." (where _ could be any alphanumeric)
-                pass  # leave token as is
-            elif last and any(word.rfind(t) == last for t in SENTENCE_TERMINALS):
+            if 0 == last or u'...' == word:
+                # any case of "..." or any single char (last == 0)
+                pass  # leave the token as it is
+            elif any(word.rfind(t) == last for t in SENTENCE_TERMINALS):
                 # "stuff."
                 tokens[-idx] = word[:-1]
                 tokens.insert(len(tokens) - idx + 1, word[-1])
-            elif last and any(word.find(t) == 0 for t in SENTENCE_TERMINALS):
+            elif any(word.find(t) == 0 for t in SENTENCE_TERMINALS):
                 # ".stuff"
                 tokens[-idx] = word[0]
                 tokens.insert(len(tokens) - idx, word[:-1])
 
             break
 
+    # keep splicing off any dangling commas and (semi-) colons
     dirty = True
-
-    # keep splicing off any dangling commas and colons:
     while dirty:
         dirty = False
         count = len(tokens)
