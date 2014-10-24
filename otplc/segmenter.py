@@ -34,20 +34,34 @@ SENTENCE_TERMINALS = u'.!?\u203C\u203D\u2047\u2047\u2049\u3002' \
 # Use upper-case for abbreviations that always are capitalized:
 # Lower-case abbreviations may occur capitalized or not.
 # Abbreviations with intervening dots (like U.S.A., Dr.med.univ., or i.e.) are auto-detected.
-ABBREVIATIONS = u"""AB abbrev AC acad AD al alt AM approx apr asap asf assn assoc aug ave
-BA BC BRA BS btw capt cent co col comdr corp cpl DC dec dept DF dist div dr ed est et etc
-feb fl fig figs gal gen gov grad hon hr inc inst jan jr jun jul lat lb lib long lt ltd
-mag mar med MD min mr mrs ms msgr mt mts mus nat nov nr oct op oz pl pop PRC prof pseud pt pub
-rer rev sep sept ser sgt sr sra st univ US USA USSR vol vs wt""".split()
+ABBREVIATIONS = u"""abbrev acad al alt approx apr asap asf assn assoc aug ave
+btw capt co col comdr corp cpl dec dept dist div dr ed est et etc
+feb fl fig figs gal gen gov grad hon inc inst jan jr jun jul lat lb lib lt ltd
+mag mar med MD mr mrs ms msgr mt mts mus nat no nov nr oct op oz pl pop prof pseud pt pub
+rer rev sep sept ser sgt sr sra srta st univ vol vs wt""".split()
 ABBREVIATIONS.extend(a.capitalize() for a in ABBREVIATIONS if a[0].islower())
 ABBREVIATIONS = u'|'.join(sorted(ABBREVIATIONS))
-ABBREVIATIONS = compile(ur'(?:\b(?:%s)|\w+\.\w+)$' % ABBREVIATIONS, UNICODE)
+ABBREVIATIONS = compile(ur'(?: \b(?:%s)|\p{L}\.\p{L}+|^\p{Lu}\p{L}+)$' % ABBREVIATIONS, UNICODE)
 "A pattern to detect common abbreviations at the candidate sentence end."
 
-NAME_ABBREV = compile(ur'\b\p{{Lu}}\p{{L}}?$', UNICODE)
-"A pattern to detect one upper-case letter and an optional letter before the candidate end."
-LAST_NAME = compile(ur'^(?:(?:\p{{Lu}}[\p{{Ll}}\p{{Lm}}]+){1,2}|\p{{Lu}}$)', UNICODE)
-"A pattern to detect capitalized first words or single upper-case letter segments."
+
+
+NAME_ABBREV = compile(
+    ur'(?:\b(?:'
+        ur'Capt\.|Captain|Col\.|Comdr\.|Corp\.|Dr\.|Doctor|Gen\.|General|Mag\.|Mr\.|Mrs\.|'
+        ur'Ms\.|Prof\.|Sgt\.|Sr\.|Sra\.|Srta\.|(?<!\p{Lu}),(?: and)?|\p{Lu}\.|by'
+    ur') |\(|\[)\p{Lu}\p{Lm}?$', UNICODE)
+"""
+A pattern to detect (likely) first name, single letter initials (L.) in special cases.
+
+The single letter initials are only recognized if they are preceded by a comma, optionally with
+the word "and" in between, or if preceded by the word "by" or another initial "L.".
+These requirements should make it more likely to be looking at an author (list) or name.
+Alternatively, if the letter is prefixed by any human-specific abbreviations (like Mr., Mrs.,
+Gen., ...) it is treated as an abbreviated initial, too.
+"""
+LAST_NAME = compile(ur'^(?:(?:\p{Lu}[\p{Ll}\p{Lm}]+){1,2}|\p{Lu}$)', UNICODE)
+"A pattern to detect (likely) last names or middle name abbreviations."
 
 SEGMENTER_REGEX = (
     ur'('   # A sentence ends at one of two sequences:
@@ -58,9 +72,9 @@ SEGMENTER_REGEX = (
     ur'(?='   # iff this potential terminating sequence is followed
     ur'[\[\(]?'   # by an optional opening bracket,
     ur'[\'\u2018\"\u201C]?'   # an optional right quote and
-    ur'[\p{{Lt}}\p{{Lu}}\p{{Nd}}\p{{Nl}}]'   # a required Unicode upper-case letter or number.
-    ur')'
-    u'|[\r\n\u2028]{}'  # Otherwise, a sentence also terminates at [consecutive?] newlines.
+    ur'(?:[\p{{Lt}}\p{{Lu}}\p{{Nd}}\p{{Nl}}]'   # a required Unicode upper-case letter or number...
+    ur'|\p{{Ll}}+[\p{{Lt}}\p{{Lu}}\p{{Nd}}\p{{Nl}}])' # ...or camelCased word (gene names!)
+    ur')|[\r\n\u2028]{}'  # Otherwise, a sentence also terminates at [consecutive?] newlines.
     ur')'
 ) % (SENTENCE_TERMINALS)#, LINEBREAK)
 """
@@ -165,7 +179,8 @@ def _sentences(spans):
     lookAhead = lambda: spans[i + 1] if len(spans) > i + 1 else u''
     isAbbrev = lambda: (terminal[0] == u'.' and
                         (ABBREVIATIONS.search(segment) or
-                         (NAME_ABBREV.search(segment) and LAST_NAME.match(lookAhead()))))
+                         (NAME_ABBREV.search(segment) and
+                          LAST_NAME.match(lookAhead()))))
     isSingleAlnum = lambda: len(segment) == 1 and segment.isalnum()
 
     for i, terminal in enumerate(spans):
@@ -200,10 +215,35 @@ def _sentence_boundaries(text, pattern):
 
 if __name__ == '__main__':
     # print one sentence per line
-    from sys import argv, stdout
+    from argparse import ArgumentParser
+    from sys import argv, stdout, stdin
+    from os import path
+    SINGLE, MULTI, WINDOWS = 0, 1, 2
 
-    for txt_file_path in argv[1:]:
-        text = open(txt_file_path, 'rt').read().decode('UTF-8')
+    parser = ArgumentParser(usage=u'%(prog)s [--mode] [FILE ...]',
+                            description=__doc__, prog=path.basename(argv[0]))
+    parser.add_argument('files', metavar='FILE', nargs='*',
+                        help=u'UTF-8 plain-text file(s); if absent, read from STDIN')
+    mode = parser.add_mutually_exclusive_group()
+    parser.set_defaults(mode=SINGLE)
+    mode.add_argument('--single',  '-s', action='store_const', dest='mode', const=SINGLE)
+    mode.add_argument('--multi',   '-m', action='store_const', dest='mode', const=MULTI)
+    mode.add_argument('--windows', '-w', action='store_const', dest='mode', const=WINDOWS)
 
-        for span in rewrite_line_separators(text, MAY_CROSS_ONE_LINE):
+    args = parser.parse_args()
+    pattern = [DO_NOT_CROSS_LINES, MAY_CROSS_ONE_LINE, WINDOW_LINEBREAK_X,][args.mode]
+
+    if not args.files and args.mode != SINGLE:
+        parser.error('only single line splitting mode allowed when reading from STDIN')
+
+    def segment(text):
+        for span in rewrite_line_separators(text, pattern):
             stdout.write(span.encode('utf-8'))
+
+
+    if args.files:
+        for txt_file_path in args.files:
+            segment(open(txt_file_path, 'rU').read().decode('UTF-8'))
+    else:
+        for line in stdin:
+            segment(line.decode('utf-8'))
