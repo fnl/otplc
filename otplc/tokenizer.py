@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Word tokenizing support.
 
@@ -6,7 +7,12 @@ If a text contains such characters, normalize it first.
 """
 from HTMLParser import HTMLParser
 from regex import compile, UNICODE, VERBOSE
-from otplc.segementer import SENTENCE_TERMINALS
+
+try:
+    from otplc.segmenter import SENTENCE_TERMINALS
+except ImportError:
+    # if used as command-line tool
+    from segmenter import SENTENCE_TERMINALS
 
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
@@ -216,3 +222,48 @@ def web_tokenizer(sentence):
     """
     return [token for i, span in enumerate(web_tokenizer.split(sentence))
             for token in ((span,) if i % 2 else word_tokenizer(unescape(span)))]
+
+
+def _tokenize(sentence, tokenizer):
+    sep = None
+
+    for token in tokenizer(sentence):
+        if sep is not None:
+            stdout.write(sep)
+
+        stdout.write(token.encode('utf-8'))
+        sep = u' '.encode('utf-8')
+
+    stdout.write(linesep)
+
+
+if __name__ == '__main__':
+    # tokenize one sentence per line input
+    from argparse import ArgumentParser
+    from sys import argv, stdout, stdin
+    from os import path, linesep
+
+
+    SPACE, SYMBOL, WORD, WEB = 0, 1, 2, 3
+
+    parser = ArgumentParser(usage=u'%(prog)s [--mode] [FILE ...]',
+                            description=__doc__, prog=path.basename(argv[0]))
+    parser.add_argument('files', metavar='FILE', nargs='*',
+                        help=u'One-Sentence-Per-Line file; if absent, read from STDIN')
+    mode = parser.add_mutually_exclusive_group()
+    parser.set_defaults(mode=WORD)
+    mode.add_argument('--space',  '-s', action='store_const', dest='mode', const=SPACE)
+    mode.add_argument('--alnum',  '-a', action='store_const', dest='mode', const=SYMBOL)
+    mode.add_argument('--token',  '-t', action='store_const', dest='mode', const=WORD)
+    mode.add_argument('--web',    '-w', action='store_const', dest='mode', const=WEB)
+
+    args = parser.parse_args()
+    tokenizer = [space_tokenizer, symbol_tokenizer, word_tokenizer, web_tokenizer,][args.mode]
+
+    if args.files:
+        for txt_file_path in args.files:
+            for line in open(txt_file_path, 'rU'):
+                _tokenize(line.decode('UTF-8'), tokenizer)
+    else:
+        for line in stdin:
+            _tokenize(line.decode('UTF-8'), tokenizer)
