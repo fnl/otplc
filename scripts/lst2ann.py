@@ -26,9 +26,7 @@ import os
 import sys
 from argparse import ArgumentParser
 
-sys.path.append(__file__)
-import otplc
-from otplc import ColumnSpecification, otpl_to_brat, Configuration
+from otplc import ColumnSpecification, otpl_to_brat, Configuration, __version__
 
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
@@ -41,9 +39,9 @@ epilog = u"colspec names: %s" % ' '.join(ColumnSpecification.NAMES.keys())
 parser = ArgumentParser(usage=u'%(prog)s [options] TARGET FILE [FILE ...]',
                         description=__doc__, epilog=epilog, prog=os.path.basename(sys.argv[0]))
 parser.add_argument('format', metavar='TARGET', choices=['otplc', 'brat'],
-                    help=u'generate {otplc,brat} standoff files from the other')
+                    help=u'generate {otplc, brat} files from the other  (ann->lst, lst->ann)')
 parser.add_argument('files', metavar='FILE', nargs='+',
-                    help=u'the annotated UTF-8 plain-text file(s)')
+                    help=u'the (annotated) UTF-8 plain-text file(s)')
 parser.add_argument('--filter', metavar='REGEX',
                     help=u'filter (skip) lines in input annotation file matching REGEX [none]')
 parser.add_argument('--name-labels', metavar='REGEX',
@@ -51,7 +49,7 @@ parser.add_argument('--name-labels', metavar='REGEX',
 
 # OTPL-specific options
 parser.add_argument('--otplc-suffix', metavar='SUFFIX', default=Configuration.OTPL_SUFFIX,
-                    help=u'OTPL annotation file SUFFIX (line-separated tokens) ["%(default)s"]' )
+                    help=u'OTPL annotation file SUFFIX (line-separated tokens) ["%(default)s"]')
 parser.add_argument('--separator', metavar='REGEX',
                     help=u'OTPL field separator REGEX (without surrounding slashes; '
                          u'/\\s+/ and /\\t/ are auto-detected)')
@@ -65,7 +63,7 @@ parser.add_argument('--config', metavar='FILE', default=Configuration.CONFIG,
                     help=u'brat annotation configuration file ["%(default)s"]')
 
 # logging/info options
-parser.add_argument('--version', action='version', version='v%s' % otplc.__version__)
+parser.add_argument('--version', action='version', version='v%s' % __version__)
 parser.add_argument('--verbose', '-v', action='count', default=0,
                     help=u'increase log level [WARN]')
 parser.add_argument('--quiet', '-q', action='count', default=0,

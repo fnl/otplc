@@ -1,9 +1,9 @@
 """
 A clear and Unicode-aware implementation of the brat annotation type system.
-All annotation types provide a class-method ``from_string`` to parse a binary string in UTF-8
-that returns the corresponding type object.
-And all types can be transformed to Unicode strings (:func:`unicode`) or be serialized to binary
-strings (:func:`str`) in UTF-8 encoding.
+All annotation types provide a class-method ``from_string`` to parse a Unicode string and
+return the corresponding type object.
+And all types can be transformed to Unicode strings (:func:`str`) or be serialized to bytes
+(:func:`bytes`) in UTF-8 encoding.
 """
 from logging import getLogger
 import os
@@ -13,7 +13,7 @@ __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
 L = getLogger('otplc.brat')
 
 
-class _Annotation(object):
+class _Annotation:
 
     """
     All annotation types are guaranteed to provide a ``uid`` and ``name`` attribute.
@@ -26,17 +26,17 @@ class _Annotation(object):
 
         Uniform annotation de-serialization.
         """
-        uid, rest = line.decode('utf-8').split(u'\t', 1)
-        name, rest = rest.split(u' ', 1)
+        uid, rest = line.split('\t', 1)
+        name, rest = rest.split(' ', 1)
         return uid, name, rest
 
     def __init__(self, uid, name):
-        self.uid = unicode(uid)
-        self.name = unicode(name)
+        self.uid = uid
+        self.name = name
 
-    def __str__(self):
-        """Uniform annotation serialization."""
-        return unicode(self).encode('utf-8')
+    def __bytes__(self):
+        """Uniform UTF-8 annotation serialization."""
+        return str(self).encode('utf-8')
 
     def __eq__(self, other):
         return vars(self) == vars(other)
@@ -55,12 +55,13 @@ class _Text(_Annotation):
     def _parse(cls, line):
         """uid``\\t``name`` ``...``\\t``text"""
         uid, name, rest = super(_Text, cls)._parse(line)
-        rest, text = rest.split(u'\t', 1)
+        rest, text = rest.split('\t', 1)
         return uid, name, rest, text
 
     def __init__(self, uid, name, text):
         super(_Text, self).__init__(uid, name)
-        self.text = unicode(text)
+        self.text = text
+
 
 class _Association(_Annotation):
 
@@ -74,16 +75,15 @@ class _Association(_Annotation):
     def _parse(cls, line):
         """uid``\\t``name[`` ``arg]+"""
         uid, name, rest = super(_Association, cls)._parse(line)
-        return uid, name, tuple(rest.split(u' '))
+        return uid, name, tuple(rest.split(' '))
 
     def __init__(self, uid, name, **args):
         super(_Association, self).__init__(uid, name)
-        args = args['args'] if len(args) == 1 and 'args' in args else args
-        self.args = dict((arg, unicode(target)) for arg, target in args.items())
+        self.args = dict(args['args']) if len(args) == 1 and 'args' in args else args
 
     @property
-    def _args_unicode(self):
-        return u' '.join(u'%s:%s' % (arg, target) for arg, target in self.args.items())
+    def _args_str(self):
+        return ' '.join('%s:%s' % arg_target for arg_target in self.args.items())
 
 
 class Entity(_Text):
@@ -96,7 +96,7 @@ class Entity(_Text):
     def from_string(cls, line):
         """uid``\\t``name`` ``start`` ``end``\\t``text"""
         uid, name, offset, text = super(Entity, cls)._parse(line)
-        start, end = offset.split(u' ', 1)
+        start, end = offset.split(' ', 1)
         return Entity(uid, name, start, end, text)
 
     def __init__(self, uid, name, start, end, text):
@@ -105,11 +105,12 @@ class Entity(_Text):
         self.end = int(end)
         assert len(text) == self.end - self.start, 'text and offsets mismatch'
 
-    def __unicode__(self):
-        return u"%s\t%s %d %d\t%s" % (self.uid, self.name, self.start, self.end, self.text)
+    def __str__(self):
+        return "%s\t%s %d %d\t%s" % (self.uid, self.name, self.start, self.end, self.text)
 
     def __eq__(self, other):
         return isinstance(other, Entity) and super(Entity, self).__eq__(other)
+
 
 class Normalization(_Text):
 
@@ -122,22 +123,22 @@ class Normalization(_Text):
         """uid``\\tReference ``target`` ``db``:``xref``\\t``text"""
         uid, name, target_ref, text = super(Normalization, cls)._parse(line)
 
-        if name != u'Reference':
+        if name != 'Reference':
             raise ValueError('illegal normalization name="%s"' % name)
 
-        target, xref = target_ref.split(u' ', 1)
-        db, xref = xref.split(u':', 1)
+        target, xref = target_ref.split(' ', 1)
+        db, xref = xref.split(':', 1)
         return Normalization(uid, target, db, xref, text)
 
     def __init__(self, uid, target, db, xref, text=None):
-        super(Normalization, self).__init__(uid, u'Reference', text if text else xref)
-        self.db = unicode(db)
-        self.xref = unicode(xref)
-        self.target = unicode(target)
+        super(Normalization, self).__init__(uid, 'Reference', text if text else xref)
+        self.db = db
+        self.xref = xref
+        self.target = target
 
-    def __unicode__(self):
-        return u"%s\tReference %s %s:%s\t%s" % (self.uid, self.target,
-                                                self.db, self.xref, self.text)
+    def __str__(self):
+        return "%s\tReference %s %s:%s\t%s" % (self.uid, self.target,
+                                               self.db, self.xref, self.text)
 
     def __eq__(self, other):
         return isinstance(other, Normalization) and super(Normalization, self).__eq__(other)
@@ -156,10 +157,10 @@ class Note(_Text):
 
     def __init__(self, uid, name, target, text):
         super(Note, self).__init__(uid, name, text)
-        self.target = unicode(target)
+        self.target = target
 
-    def __unicode__(self):
-        return u"%s\t%s %s\t%s" % (self.uid, self.name, self.target, self.text)
+    def __str__(self):
+        return "%s\t%s %s\t%s" % (self.uid, self.name, self.target, self.text)
 
     def __eq__(self, other):
         return isinstance(other, Note) and super(Note, self).__eq__(other)
@@ -183,12 +184,12 @@ class Relation(_Association):
         return Relation(uid, name, target1, target2)
 
     def __init__(self, uid, name, target1, target2):
-        target1 = target1[target1.find(u':') + 1:]
-        target2 = target2[target2.find(u':') + 1:]
+        target1 = target1[target1.find(':') + 1:]
+        target2 = target2[target2.find(':') + 1:]
         super(Relation, self).__init__(uid, name, Arg1=target1, Arg2=target2)
 
-    def __unicode__(self):
-        return u"%s\t%s %s" % (self.uid, self.name, self._args_unicode)
+    def __str__(self):
+        return "%s\t%s %s" % (self.uid, self.name, self._args_str)
 
     def __eq__(self, other):
         return isinstance(other, Relation) and super(Relation, self).__eq__(other)
@@ -199,23 +200,23 @@ class Event(_Association):
     """
     An association type with an (entity) ``trigger``.
 
-    Arguments should be argument type, target pairs, like {Argument=u'T2')
+    Arguments should be argument type, target pairs, like {Argument='T2')
     """
 
     @classmethod
     def from_string(cls, line):
         """uid``\\t``name:trigger[`` ``arg``:``target]+"""
         uid, named_trigger, args = super(Event, cls)._parse(line)
-        name, trigger = named_trigger.split(u':', 1)
-        args = dict(a_t.split(u':') for a_t in args)
+        name, trigger = named_trigger.split(':', 1)
+        args = dict(a_t.split(':') for a_t in args)
         return Event(uid, name, trigger, **args)
 
     def __init__(self, uid, name, trigger, **args):
         super(Event, self).__init__(uid, name, **args)
-        self.trigger = unicode(trigger)
+        self.trigger = trigger
 
-    def __unicode__(self):
-        return u"%s\t%s:%s %s" % (self.uid, self.name, self.trigger, self._args_unicode)
+    def __str__(self):
+        return "%s\t%s:%s %s" % (self.uid, self.name, self.trigger, self._args_str)
 
     def __eq__(self, other):
         return isinstance(other, Event) and super(Event, self).__eq__(other)
@@ -237,8 +238,8 @@ class Equiv(_Annotation):
         super(Equiv, self).__init__(uid, name)
         self.targets = tuple(targets)
 
-    def __unicode__(self):
-        return u"%s\t%s %s" % (self.uid, self.name, u' '.join(self.targets))
+    def __str__(self):
+        return "%s\t%s %s" % (self.uid, self.name, ' '.join(self.targets))
 
     def __eq__(self, other):
         return isinstance(other, Equiv) and super(Equiv, self).__eq__(other)
@@ -255,7 +256,7 @@ class Attribute(_Annotation):
         """uid``\\t``name`` ``target[`` ``modifier]"""
         uid, name, target = super(Attribute, cls)._parse(line)
         # split off the value if there is one, otherwise use ``None`` as value:
-        target, modifier = target.split(u' ', 1) if u' ' in target else (target, None)
+        target, modifier = target.split(' ', 1) if ' ' in target else (target, None)
         return Attribute(uid, name, target, modifier)
 
     def __init__(self, uid, name, target, modifier=None):
@@ -263,9 +264,9 @@ class Attribute(_Annotation):
         self.target = target
         self.modifier = modifier
 
-    def __unicode__(self):
-        value = u' %s' % self.modifier if self.modifier else ''
-        return u"%s\t%s %s%s" % (self.uid, self.name, self.target, value)
+    def __str__(self):
+        value = ' %s' % self.modifier if self.modifier else ''
+        return "%s\t%s %s%s" % (self.uid, self.name, self.target, value)
 
     def __eq__(self, other):
         return isinstance(other, Attribute) and super(Attribute, self).__eq__(other)
@@ -282,16 +283,16 @@ _PARSE = {
     'M': Attribute.from_string,  # legacy support (is this still needed?)
 }
 
-_ERROR_MSG = u'%s on line %d in %s: "%s"'
+_ERROR_MSG = '%s on line %d in %s: "%s"'
 
 _ERROR_REASON = {
-    ValueError: u'format error',
-    TypeError: u'illegal attribute type',
-    KeyError: u'unknown annotation',
+    ValueError: 'format error',
+    TypeError: 'illegal attribute type',
+    KeyError: 'unknown annotation',
 }
 
 
-def read(file_path, filter=None, strict=False, mode='rU', **open_args):
+def read(file_path, filter=None, strict=False, encoding='utf-8', **open_args):
     """
     Yield annotation instances by parse a brat annotation file.
 
@@ -300,40 +301,44 @@ def read(file_path, filter=None, strict=False, mode='rU', **open_args):
     :param file_path: the file to read
     :param filter: a compiled regex pattern; any input line that matches is skipped
     :param strict: re-raise errors instead of skipping annotations that cannot be parsed
-    :param mode: for :func:`open`
+    :param encoding: for :func:`open`
     :param open_args: for :func:`open`
     :return: a generator for :class:`_Annotation` instances
     :raises IOError: if there is a "technical" problem opening/reading the file
     """
     skip = _makeFilterFunction(filter)
 
-    with open(file_path, mode=mode, **open_args) as file:
-        for lno, bytes in enumerate(file, 1):
-            bytes = bytes.strip()
+    with open(file_path, encoding=encoding, **open_args) as file:
+        for lno, raw in enumerate(file, 1):
+            line = raw.strip()
 
-            if bytes and not skip(bytes):
-                annotation = bytes[0]
+            if line and not skip(line):
+                annotation_type = line[0]
 
                 try:
                     # noinspection PyCallingNonCallable
-                    yield _PARSE[annotation](bytes)
+                    yield _PARSE[annotation_type](line)
                 except (ValueError, TypeError, KeyError, Exception) as error:
-                    error_args = (lno, file_path, bytes.decode('utf-8'))
+                    _handleError(error, file_path, line, lno, strict)
 
-                    try:
-                        L.error(_ERROR_MSG, _ERROR_REASON[type(error)], *error_args)
-                    except KeyError:
-                        L.error(_ERROR_MSG, error.message, *error_args)
 
-                    if strict:
-                        raise error
+def _handleError(error, file_path, line, lno, strict):
+    error_args = (lno, file_path, line)
+
+    try:
+        L.error(_ERROR_MSG, _ERROR_REASON[type(error)], *error_args)
+    except KeyError:
+        L.error(_ERROR_MSG, error.message, *error_args)
+
+    if strict:
+        raise error
 
 
 def _makeFilterFunction(filter):
     return (
-        lambda b: False
+        lambda line: False
     ) if filter is None else (
-        lambda b: filter.search(b.decode('utf-8'))
+        lambda line: filter.search(line)
     )
 
 

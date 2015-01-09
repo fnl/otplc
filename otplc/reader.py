@@ -4,6 +4,7 @@ Functionality for reading and working with OTPL files.
 from collections import defaultdict
 from logging import getLogger
 from re import compile
+
 from otplc.colspec import ColumnSpecification as C
 
 
@@ -62,20 +63,19 @@ class OtplReader(object):
     properly defined before iterating.
     """
 
-
-    def __init__(self, file_path, mode='rU', **open_args):
+    def __init__(self, file_path, encoding='utf-8', **open_args):
         """
         Create a new reader instance.
 
         :param file_path: the OTPL file location
-        :param mode: the `open` mode
-        :param open_args: other `open` keyword arguments
+        :param encoding: note that OTPL files by default should use UTF-8 encoding
+        :param open_args: `open` keyword arguments other than the defaults
         """
         self._file_path = file_path
-        self._mode = mode
+        self._encoding = encoding
         self._open_args = open_args
-        self._separator = None  # must be initialized!
-        self._filter = compile(r'^$')
+        self._separator = None
+        self._filter = compile(r'^$')  # skip lines matching "self._filter.search(line)"
 
     def __iter__(self):
         """
@@ -91,15 +91,9 @@ class OtplReader(object):
         column_count = 0
         segment = []
 
-        for lno, raw in enumerate(open(self._file_path, mode=self._mode, **self._open_args), 1):
-            line = raw.rstrip('\r\n').decode('utf-8')
-
+        for lno, line in enumerate(self._open(), 1):
             if line:
-                if not self._filter.search(line):
-                    segment.append(self._extractFields(line, lno, column_count))
-
-                    if column_count == 0:
-                        column_count = len(segment[0])
+                column_count = self._parseLine(line, lno, segment, column_count)
             elif segment:
                 yield segment
                 segment = []
@@ -134,10 +128,7 @@ class OtplReader(object):
         count = 0
 
         try:
-            for raw in open(self._file_path, mode=self._mode, **self._open_args):
-                raw.rstrip('\r\n')
-                line = raw.decode()
-
+            for line in self._open():
                 if line and not self._filter.match(line):
                     spaces_fields[len(SPACES.split(line))] += 1
                     tab_fields[len(TAB.split(line))] += 1
@@ -159,6 +150,17 @@ class OtplReader(object):
             )
 
         return fields
+
+    def _open(self):
+        for raw_line in open(self._file_path, encoding=self._encoding, **self._open_args):
+            yield raw_line.rstrip('\r\n')
+
+    def _parseLine(self, line, lno, segment, column_count):
+        if not self._filter.search(line):
+            segment.append(self._extractFields(line, lno, column_count))
+            column_count = len(segment[0]) if column_count == 0 else column_count
+
+        return column_count
 
     @property
     def path(self):

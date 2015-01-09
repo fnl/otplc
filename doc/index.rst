@@ -4,18 +4,16 @@
 OTPLC Documentation
 ###################
 
-A bidirectional brat_ ↔︎ OTPL format converter
-(in slowly but surely out-dated Python **2** only, just as brat itself).
+A bidirectional brat_ standoff ↔︎ OTPL (one token per line) format converter for Python 3.
+(Note that brat itself is based on Python 2.)
 
 Why would you need this tool?
-Many sequence taggers work with OTPL files; for example, CRFSuite_, Factorie_, MALLET_, or Wapiti_.
-But no other tool can create as stunning visualizations of text annotations, including relations
-and events between them, as brat_ does.
-Therefore, it would be great if any corpora could be converted to and from those format to be able
-to use them to train a sequence tagger.
-Furthermore, it would be great to go back into brat to visually inspect the results of the tagger
-on unseen data.
-This scenario is exactly what this Python 2 package solves.
+Many (most?) sequence taggers work with OTPL (one token per line) files to create text annotations;
+For example, CRFSuite_, Factorie_, MALLET_, or Wapiti_.
+But with brat one can create and manipulate visualizations of text annotations like no other tool.
+brat can even show dependency relations and annotate semantic events between them.
+Therefore, this tool helps to convert any OTPL corpus to and from the brat standoff format.
+With OTPLC, it is possible to develop OTPL sequence taggers, and visually inspect, correct, and evaluate the annotations with brat.
 
 .. _brat: http://brat.nlplab.org/index.html
 .. _CRFSuite: http://www.chokkan.org/software/crfsuite/
