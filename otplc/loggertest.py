@@ -8,6 +8,7 @@ from functools import reduce
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
 
+
 def filterIf(val, pos, msgs):
     if val is not None:
         return filter(lambda m: m[pos] == val, msgs)
@@ -43,7 +44,7 @@ class LoggingTestHandler(BufferingHandler):
             partial(filterIf, msg, 2),
             partial(filterIf, args, 3),
         ]
-        matches = reduce(reverseApply, filters, messages)
+        matches = list(reduce(reverseApply, filters, messages))
 
         if len(matches) != count:
             if len(matches) == 0:

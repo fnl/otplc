@@ -1,5 +1,5 @@
 # coding=utf-8
-from otplc import ColumnSpecification
+from otplc import ColumnSpecification, Configuration
 from otplc.reader import SPACES, TAB, DataFormatError, configure_reader, guess_colspec
 from otplc.test_base import OtplTestBase
 
@@ -10,10 +10,12 @@ class TestReader(OtplTestBase):
 
     def setUp(self):
         super(TestReader, self).setUp()
-        self.segments = configure_reader(self.otpl_file.name, sep_regex=r'\s+')
+        config = Configuration([__file__])
+        config.separator = r'\s+'
+        self.segments = configure_reader(self.otpl_file.name, config)
 
     def testVariableColumnNumbers(self):
-        self.otpl_file.write(u"1\t2\t3\n1\t2\n".encode('utf-8'))
+        self.otpl_file.write(u"1\t2\t3\n1\t2\n")
         self.otpl_file.close()
         self.assertRaisesRegexp(DataFormatError, u'line 2 has 2 columns, but expected 3',
                                 list, self.segments)
@@ -24,7 +26,7 @@ class TestReader(OtplTestBase):
             u"2 seg1 2 tok2 tag2 0 null 2 1 ent1\n\n"
             u"3 seg2 1 tok3 tag3 0 null 3 1 ent2\n"
             u"4 seg2 2 tok4 tag4 1 rel2 0 0 null\n\n"
-        ).encode('utf-8'))
+        ))
         self.otpl_file.close()
         expected_segments = [
             [[u'1', u'seg1', u'1', u'tok1', u'tag1', u'2', u'rel1', u'0', u'0', u'null'],
@@ -40,14 +42,14 @@ class TestReader(OtplTestBase):
 
     def testGuessSepSpaces(self):
         self.otpl_file.write((u"1 tok1\ttag1\n2 tok2\ttag2\n\n"
-                              u"1 tok3\ttag3\n2 tok4\ttag4\n\n").encode('utf-8'))
+                              u"1 tok3\ttag3\n2 tok4\ttag4\n\n"))
         self.otpl_file.close()
         self.assertTrue(self.segments.detect_separator())
         self.assertEqual(SPACES.pattern, self.segments.separator)
 
     def testGuessSepTab(self):
         self.otpl_file.write((u"1\ttok 1\ttag 1\n2\ttok2\ttag 2\n\n"
-                              u"1\ttok 3\ttag 3\n2\ttok4\ttag 4\n\n").encode('utf-8'))
+                              u"1\ttok 3\ttag 3\n2\ttok4\ttag 4\n\n"))
         self.otpl_file.close()
         self.assertTrue(self.segments.detect_separator())
         self.assertEqual(TAB.pattern, self.segments.separator)
@@ -70,7 +72,7 @@ class TestReader(OtplTestBase):
             u"1 tok1 ent1 ent5 2 2 event1\n"
             u"1 tok2 ent2 ent6 3 1 event2\n"
             u"1 tok3 ent3 ent7 1 3 event3\n\n"
-            u"2 tok4 ent4 ent8 1 1 event4\n\n" % (header),
+            u"2 tok4 ent4 ent8 1 1 event4\n\n" % header,
             header
         )
 
@@ -134,8 +136,8 @@ class TestReader(OtplTestBase):
             u"TOKEN POS_TAG LOCAL_REF RELATION"
         )
 
-    def guessColspec(self, otpl_unicode, header):
-        self.otpl_file.write(otpl_unicode.encode('utf-8'))
+    def guessColspec(self, otpl_text, header):
+        self.otpl_file.write(otpl_text)
         self.otpl_file.close()
         expected = ColumnSpecification.from_string(header)
         result = guess_colspec(self.segments)

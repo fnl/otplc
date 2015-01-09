@@ -18,6 +18,7 @@ L = getLogger('otplc.reader')
 TAB = compile('\t')
 SPACES = compile(r'\s+')
 NORM = compile(r'^(?:\S+:\S+|NULL)$')
+DEFAULT_ENCODING = 'utf-8'
 
 
 class DataFormatError(Exception):
@@ -25,27 +26,25 @@ class DataFormatError(Exception):
     pass
 
 
-def configure_reader(file_path, filter_regex=None, sep_regex=None):
+def configure_reader(file_path, config):
     """
     Create a new :class:`OtplReader`, optionally with a filter regex and a pre-defined column
     separator regex.
 
     :param file_path: to the OTPL file
-    :param filter_regex: lines to skip in the OTPL file
-    :param sep_regex: regex used to split lines into columns
+    :param config: a :class:`otplc.settings.Configuation` object
     :return: a :class:`OtplReader` instance
     """
-    reader = OtplReader(file_path)
+    reader = OtplReader(file_path, encoding=config.encoding)
 
-    if filter_regex is not None:
-        reader.filter = filter_regex
+    if config.filter is not None:
+        reader.filter = config.filter
 
-    if sep_regex is not None:
-        reader.separator = sep_regex
-    else:
-        if not reader.detect_separator():
-            L.error(u'for "%s" failed: not field separator detected', file_path)
-            reader = None
+    if config.separator is not None:
+        reader.separator = config.separator
+    elif not reader.detect_separator():
+        L.error(u'for "%s" failed: not field separator detected', file_path)
+        reader = None
 
     return reader
 
@@ -63,16 +62,14 @@ class OtplReader(object):
     properly defined before iterating.
     """
 
-    def __init__(self, file_path, encoding='utf-8', **open_args):
+    def __init__(self, file_path, **open_args):
         """
         Create a new reader instance.
 
         :param file_path: the OTPL file location
-        :param encoding: note that OTPL files by default should use UTF-8 encoding
         :param open_args: `open` keyword arguments other than the defaults
         """
         self._file_path = file_path
-        self._encoding = encoding
         self._open_args = open_args
         self._separator = None
         self._filter = compile(r'^$')  # skip lines matching "self._filter.search(line)"
@@ -137,7 +134,7 @@ class OtplReader(object):
                     if count > 9 or (len(spaces_fields) > 1 and len(tab_fields) > 1):
                         break
         except IOError as e:
-            L.error(e.message)
+            L.error(str(e))
 
         return spaces_fields, tab_fields
 
@@ -152,7 +149,7 @@ class OtplReader(object):
         return fields
 
     def _open(self):
-        for raw_line in open(self._file_path, encoding=self._encoding, **self._open_args):
+        for raw_line in open(self._file_path, **self._open_args):
             yield raw_line.rstrip('\r\n')
 
     def _parseLine(self, line, lno, segment, column_count):
@@ -230,7 +227,7 @@ def guess_colspec(otpl_reader):
     try:
         guess = _make_guess(otpl_reader)
     except (IOError, UnicodeDecodeError, DataFormatError) as e:
-        L.warning(e.message)
+        L.warning(str(e))
         guess = []
 
     if isinstance(guess, C):

@@ -1,4 +1,5 @@
 # coding=utf-8
+from io import TextIOWrapper
 import os
 from mock import MagicMock, patch, sentinel, call
 from unittest import TestCase
@@ -18,18 +19,18 @@ class TestAnnotation(TestCase):
         return ann
 
     def assertAttributes(self, ann):
-        self.assertEqual(u'ID', ann.uid)
+        self.assertEqual('ID', ann.uid)
 
         if isinstance(ann, Normalization):
-            self.assertEqual(u'Reference', ann.name)
+            self.assertEqual('Reference', ann.name)
         else:
-            self.assertEqual(u'name', ann.name)
+            self.assertEqual('name', ann.name)
 
     def assertIsEqual(self, ann, getAttrs=lambda ann: vars(ann)):
         other = ann.__class__(**getAttrs(ann))
-        self.assertEqual(ann, other, u'%s != %s' % (unicode(ann), unicode(other)))
+        self.assertEqual(ann, other, '%s != %s' % (str(ann), str(other)))
         self.assertFalse(ann != other)
-        other.uid = u'ANOTHER'
+        other.uid = 'ANOTHER'
         self.assertNotEqual(ann, other)
         self.assertFalse(ann == other)
 
@@ -38,7 +39,7 @@ class TestText(TestAnnotation):
 
     def assertAttributes(self, ann):
         super(TestText, self).assertAttributes(ann)
-        self.assertEqual(u'text', ann.text)
+        self.assertEqual('text', ann.text)
 
 
 class TestAssociation(TestAnnotation):
@@ -66,9 +67,9 @@ class TestNormalization(TestText):
 
     def test_from_string(self):
         ann = self.assertStringify(Normalization)
-        self.assertEqual(u'target', ann.target)
-        self.assertEqual(u'db', ann.db)
-        self.assertEqual(u'xref', ann.xref)
+        self.assertEqual('target', ann.target)
+        self.assertEqual('db', ann.db)
+        self.assertEqual('xref', ann.xref)
 
     def test_equality(self):
         def getAttr(ann):
@@ -84,7 +85,7 @@ class TestNote(TestText):
 
     def test_from_string(self):
         ann = self.assertStringify(Note)
-        self.assertEqual(u'target', ann.target)
+        self.assertEqual('target', ann.target)
 
     def test_equality(self):
         self.assertIsEqual(Note.from_string(self.STRING))
@@ -92,13 +93,13 @@ class TestNote(TestText):
 
 class TestRelation(TestAssociation):
     STRING = 'ID\tname Arg1:arg1 Arg2:arg2'
-    ARGS = {u'Arg1': u'arg1', u'Arg2': u'arg2'}
+    ARGS = {'Arg1': 'arg1', 'Arg2': 'arg2'}
 
     def test_from_string(self):
         self.assertStringify(Relation)
 
     def test_add_arguments(self):
-        ann = Relation.from_string(u'ID\tname arg1 arg2')
+        ann = Relation.from_string('ID\tname arg1 arg2')
         self.assertEqual(TestRelation.ARGS, ann.args)
 
     def test_equality(self):
@@ -114,11 +115,11 @@ class TestRelation(TestAssociation):
 
 class TestEvent(TestAssociation):
     STRING = 'ID\tname:trigger Arg1:arg1 Arg2:arg2 Arg3:arg3'
-    ARGS = {u'Arg1': u'arg1', u'Arg2': u'arg2', u'Arg3': u'arg3'}
+    ARGS = {'Arg1': 'arg1', 'Arg2': 'arg2', 'Arg3': 'arg3'}
 
     def test_from_string(self):
         ann = self.assertStringify(Event)
-        self.assertEqual(u'trigger', ann.trigger)
+        self.assertEqual('trigger', ann.trigger)
 
     def test_equality(self):
         self.assertIsEqual(Event.from_string(self.STRING))
@@ -126,16 +127,16 @@ class TestEvent(TestAssociation):
 
 class TestEquiv(TestAnnotation):
     STRING = 'ID\tname T1 T2 T3'
-    TARGETS = (u'T1', u'T2', u'T3')
+    TARGETS = ('T1', 'T2', 'T3')
 
     def test_from_string(self):
         ann = self.assertStringify(Equiv)
         self.assertEqual(TestEquiv.TARGETS, ann.targets)
 
-    def test_unicode(self):
-        case = u'the\tuni\U00011111code test'
-        ann = Equiv.from_string(case.encode('UTF-8'))
-        self.assertSequenceEqual(case, unicode(ann))
+    def test_str(self):
+        case = 'the\tuni\U00011111code test'
+        ann = Equiv.from_string(case)
+        self.assertSequenceEqual(case, str(ann))
 
     def test_equality(self):
         self.assertIsEqual(Equiv.from_string(self.STRING))
@@ -146,12 +147,12 @@ class TestAttribute(TestAnnotation):
 
     def test_from_string(self):
         ann = self.assertStringify(Attribute)
-        self.assertEqual(u'target', ann.target)
+        self.assertEqual('target', ann.target)
         self.assertEqual(None, ann.modifier)
 
     def test_with_value(self):
-        ann = Attribute.from_string(u'ID\tname target modifier')
-        self.assertEqual(u'modifier', ann.modifier)
+        ann = Attribute.from_string('ID\tname target modifier')
+        self.assertEqual('modifier', ann.modifier)
 
     def test_equality(self):
         self.assertIsEqual(Attribute.from_string(self.STRING))
@@ -162,18 +163,18 @@ class TestRead(TestCase):
     def assertRead(self, expected_anns, string_anns):
         expected_anns = list(reversed(expected_anns))
 
-        with patch('__builtin__.open', create=True) as open_mock:
-            open_mock.return_value = MagicMock(spec=file)
+        with patch('builtins.open', create=True) as open_mock:
+            open_mock.return_value = MagicMock(spec=TextIOWrapper)
             handle = open_mock.return_value.__enter__.return_value
             handle.__iter__.return_value = string_anns
 
             for ann in read(sentinel.file_path):
                 self.assertEqual(expected_anns.pop(), ann)
 
-        self.assertEqual(0, len(expected_anns), u', '.join(ann.uid for ann in expected_anns))
+        self.assertEqual(0, len(expected_anns), ', '.join(ann.uid for ann in expected_anns))
 
     def test_normal(self):
-        cases = [Entity(u'T1', u'name', 0, 4, u'text'), Attribute(u'A1', u'name', u'target')]
+        cases = [Entity('T1', 'name', 0, 4, 'text'), Attribute('A1', 'name', 'target')]
         raw = ['%s%s' % (str(c), os.linesep) for c in cases]
         self.assertRead(cases, raw)
 
@@ -181,11 +182,11 @@ class TestRead(TestCase):
 class TestWrite(TestCase):
 
     def assertWrite(self, expected_lines, annotations):
-        file_mock = MagicMock(spec=file)
+        file_mock = MagicMock(spec=TextIOWrapper)
         expected_lines = [(l, os.linesep) for l in expected_lines]
         expected_lines = [item for pair in expected_lines for item in pair]
 
-        with patch('__builtin__.open', create=True) as open_mock:
+        with patch('builtins.open', create=True) as open_mock:
             open_mock.return_value.__enter__.return_value = file_mock
             write(sentinel.file_path, annotations)
 
@@ -195,6 +196,6 @@ class TestWrite(TestCase):
         self.assertEqual(len(expected_lines), len(file_mock.write.call_args_list))
 
     def test_normal(self):
-        cases = [Entity(u'T1', u'Entity', 0, 3, u'txt'), Attribute(u'A1', u'Attribute', u'T1')]
+        cases = [Entity('T1', 'Entity', 0, 3, 'txt'), Attribute('A1', 'Attribute', 'T1')]
         raw = ['%s' % str(c) for c in cases]
         self.assertWrite(raw, cases)

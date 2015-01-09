@@ -104,11 +104,12 @@ class ColumnSpecificationMetaClass(type):
 
     def __init__(cls, name, bases, namespace):
         super(ColumnSpecificationMetaClass, cls).__init__(name, bases, namespace)
+        cls._NAMES = None
 
     @property
     def NAMES(cls):
         """A column name-to-integer dictionary."""
-        if not hasattr(cls, '_NAMES'):
+        if cls._NAMES is None:
             cls._NAMES = ColumnSpecificationMetaClass._getMapping(cls)
 
         return cls._NAMES
@@ -128,15 +129,13 @@ class ColumnSpecificationMetaClass(type):
                      if name.isupper() and isinstance(getattr(cls, name), int)])
 
 
-class ColumnSpecification(object):
+class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
 
     """
     The specification of column types and facilities to instantiate a spec
     from a *colspec header* (in the OTPL file) using :py:meth:`.from_string`
     or a list of integers using :py:meth:`.from_integers` .
     """
-
-    __metaclass__ = ColumnSpecificationMetaClass
 
     _ANNOTATION = 99
     "*Internal*: A (yet) unspecific *annotation* (for internal use only)."
@@ -227,9 +226,9 @@ class ColumnSpecification(object):
         """Convert a colspec integer list to a colspec header string."""
         try:
             # noinspection PyUnresolvedReferences
-            return ' '.join(cls.INTEGERS.get(c, u'_TYPE_') for c in colspec)
+            return ' '.join(cls.INTEGERS.get(c, '_TYPE_') for c in colspec)
         except TypeError:
-            raise TypeError(u'colspec not a list')
+            raise TypeError('colspec not a list')
 
     @classmethod
     def parse_colspec(cls, header):
@@ -239,7 +238,7 @@ class ColumnSpecification(object):
         For example::
 
             >>> ColumnSpecification.parse_colspec(
-            ...     u'SEGMENT_ID LOCAL_ENUM TOKEN POS_TAG LOCAL_REF RELATION'
+            ...     'SEGMENT_ID LOCAL_ENUM TOKEN POS_TAG LOCAL_REF RELATION'
             ... )
             [2, 4, 1, 5, 11, 8]
 
@@ -248,7 +247,7 @@ class ColumnSpecification(object):
         try:
             names = header.split()
         except AttributeError:
-            raise TypeError(u'header not a string')
+            raise TypeError('header not a string')
 
         colspec = [cls._UNKNOWN] * len(names)
         known_names = cls.NAMES
@@ -261,16 +260,16 @@ class ColumnSpecification(object):
     @classmethod
     def __getValue(cls, colspec, idx, name, known_names):
         if name.startswith('_'):
-            L.warning(u'using an internal colspec type; probably a Bad Idea')
-        if u':' in name:
-            name = name[:name.index(u':')]
+            L.warning('using an internal colspec type; probably a Bad Idea')
+        if ':' in name:
+            name = name[:name.index(':')]
         if name in known_names:
             colspec[idx] = getattr(cls, name)
         else:
-            raise ValueError(u'illegal "%s" in column %s' % (name, idx + 1))
+            raise ValueError('illegal "%s" in column %s' % (name, idx + 1))
 
     def __init__(self, colspec, headers):
-        assert len(colspec) > 1, u'single-column colspec'
+        assert len(colspec) > 1, 'single-column colspec'
         assert len(colspec) == len(headers)
         self._width = len(colspec)
         self._token = None
@@ -307,7 +306,7 @@ class ColumnSpecification(object):
             ColumnSpecification.ATTRIBUTE:
                 partial(self._addProperty, self._attributes, colspec),
             ColumnSpecification._UNKNOWN:
-                lambda col: L.info(u'ignoring _UNKNOWN column %s', col + 1),
+                lambda col: L.info('ignoring _UNKNOWN column %s', col + 1),
         }
 
         for idx, coltype in enumerate(colspec):
@@ -316,7 +315,7 @@ class ColumnSpecification(object):
                 setUp[coltype](idx)
             except KeyError:
                 raise ValueError(
-                    u'unknown %s (%d) column %d' % (headers[idx], coltype, idx + 1)
+                    'unknown %s (%d) column %d' % (headers[idx], coltype, idx + 1)
                 )
 
         self.__initEvents(colspec)
@@ -327,7 +326,7 @@ class ColumnSpecification(object):
             self._events[col] = (ref_cols[0], ref_cols[1:])
 
             if len(self._events[col][1]) < 1:
-                raise ValueError(u'EVENT column %d has less than two references' % (col + 1))
+                raise ValueError('EVENT column %d has less than two references' % (col + 1))
 
     def __eq__(self, other):
         if not isinstance(other, ColumnSpecification):
@@ -353,7 +352,7 @@ class ColumnSpecification(object):
             col += 1
             coltype = self.get_type(col)
 
-        return u' '.join(names)
+        return ' '.join(names)
 
     def get_type(self, col):
         """ Return the column type integer for this column or ``None``. """
@@ -385,7 +384,7 @@ class ColumnSpecification(object):
             return None
 
     def __getReferencesBefore(self, colspec, col):
-        for idx in xrange(col - 1, 0, -1):
+        for idx in range(col - 1, 0, -1):
             if colspec[idx] in (ColumnSpecification.LOCAL_REF, ColumnSpecification.GLOBAL_REF):
                 yield idx
             else:
@@ -475,7 +474,7 @@ class ColumnSpecification(object):
         elif self.is_event(col):
             return ColumnSpecification.EVENT
         else:
-            raise ValueError(u'column %d not a valid property target' % (col + 1))
+            raise ValueError('column %d not a valid property target' % (col + 1))
 
     def set_global_enum(self, val):
         self._setColumn('global_enum', val)
@@ -496,11 +495,11 @@ class ColumnSpecification(object):
         if old is None:
             setattr(self, attr, int(val))
         else:
-            raise ValueError(u'%s already assigned to column %d' % (name.upper(), old + 1))
+            raise ValueError('%s already assigned to column %d' % (name.upper(), old + 1))
 
     def _addRelation(self, headers, collection, colspec, col):
         if not colspec[col - 1] in (ColumnSpecification.LOCAL_REF, ColumnSpecification.GLOBAL_REF):
-            raise ValueError(u'RELATION column %d has no reference' % (col + 1))
+            raise ValueError('RELATION column %d has no reference' % (col + 1))
 
         self.__ensureUndefined(collection, colspec, col)
         self.__setTargetFromHeader(headers, collection, colspec, col)
@@ -516,21 +515,21 @@ class ColumnSpecification(object):
     def __ensureUndefined(self, collection, colspec, col):
         if col in collection:
             # noinspection PyUnresolvedReferences
-            raise ValueError(u'%s column %d already mapped' %
+            raise ValueError('%s column %d already mapped' %
                              (ColumnSpecification.INTEGERS[colspec[col]], col + 1))
 
     def __setTargetFromHeader(self, headers, collection, colspec, col):
         header = headers[col]
 
-        if u':' in header:
-            target = int(header[header.index(u':') + 1:]) - 1
+        if ':' in header:
+            target = int(header[header.index(':') + 1:]) - 1
 
             # named references can point to any property, not just entities
             if colspec[target] in ColumnSpecification._PROPERTY_TARGET_COLUMNS:
                 collection[col] = target
             else:
                 # noinspection PyUnresolvedReferences
-                raise ValueError(u'target (%s) of %s column %d invalid' %
+                raise ValueError('target (%s) of %s column %d invalid' %
                                  (ColumnSpecification.INTEGERS[colspec[target]], header, col + 1))
         else:
             self.__setTarget(collection, colspec, col, ColumnSpecification._ENTITY_COLUMNS)
@@ -544,7 +543,7 @@ class ColumnSpecification(object):
                 collection[col] = target
                 break
             elif colspec[target] not in ColumnSpecification._SKIPPED_COLUMNS:
-                raise ValueError(u'%s column %d has no target' %
+                raise ValueError('%s column %d has no target' %
                                  (source, col + 1))
         else:
-            raise ValueError(u'%s column %s with no target' % (source, col + 1))
+            raise ValueError('%s column %s with no target' % (source, col + 1))

@@ -83,7 +83,8 @@ class _Association(_Annotation):
 
     @property
     def _args_str(self):
-        return ' '.join('%s:%s' % arg_target for arg_target in self.args.items())
+        # sorted arg:target string (to ensure equal reproducibility)
+        return ' '.join('%s:%s' % arg_target for arg_target in sorted(self.args.items()))
 
 
 class Entity(_Text):
@@ -328,7 +329,7 @@ def _handleError(error, file_path, line, lno, strict):
     try:
         L.error(_ERROR_MSG, _ERROR_REASON[type(error)], *error_args)
     except KeyError:
-        L.error(_ERROR_MSG, error.message, *error_args)
+        L.error(_ERROR_MSG, str(error), *error_args)
 
     if strict:
         raise error
