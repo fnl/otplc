@@ -55,29 +55,31 @@ logging.basicConfig(level=logging.WARNING + log_adjust,
 logging.info('verbosity increased')
 logging.debug('verbosity increased')
 
+
+def open_file(base, filecount, ext):
+    out_file = "%s-%i%s" % (base, filecount, ext)
+    return open(out_file, encoding=Configuration.ENCODING, mode='wt')
+
+
 for in_file in args.files:
     base, ext = splitext(in_file)
-    filecount = 0
+    filecount = 1
     segments = 0
-    out_stream = None
+    out_stream = open_file(base, filecount, ext)
 
     with open(in_file, encoding=Configuration.ENCODING) as in_stream:
         for lno, raw in enumerate(in_stream, 1):
-            if segments % args.factor == 0:
-                if out_stream is not None:
-                    out_stream.close()
-
-                filecount += 1
-                out_file = "%s-%i%s" % (base, filecount, ext)
-                out_stream = open(out_file, encoding=Configuration.ENCODING, mode='wt')
-
             line = raw.strip()
 
             if not line:
                 segments += 1
                 print('', file=out_stream)
+
+                if segments % args.factor == 0:
+                    out_stream.close()
+                    filecount += 1
+                    out_stream = open_file(base, filecount, ext)
             else:
                 print(line, file=out_stream)
 
-    if out_stream is not None:
-        out_stream.close()
+    out_stream.close()
