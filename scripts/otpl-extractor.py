@@ -26,7 +26,7 @@ import os
 import sys
 from argparse import ArgumentParser
 from otplc import Configuration, ColumnSpecification
-from otplc.extractor import otpl_to_text
+from otplc.extractor import otpl_to_text, segment_otpl_file
 
 
 __author__ = 'Florian Leitner <florian.leitner@gmail.com>'
@@ -38,6 +38,10 @@ parser = ArgumentParser(usage='%(prog)s [options] FILE [FILE ...]',
                         description=__doc__, epilog=comment, prog=os.path.basename(sys.argv[0]))
 parser.add_argument('files', metavar='FILE', nargs='+',
                     help='the OTPL file(s)')
+
+parser.add_argument('--segment', metavar='FACTOR', type=int, default=0,
+                    help='split OTPL files after every FACTOR segments before extracting '
+                         '(generates new OTPL file)')
 
 # Text output
 parser.add_argument('--text-suffix', metavar='SUFFIX', default=Configuration.TEXT_SUFFIX,
@@ -83,4 +87,13 @@ if args.colspec:
 config.text_suffix = args.text_suffix
 config.filter = args.filter
 config.separator = args.separator
+
+if args.segment > 0:
+    segment_file_names = []
+
+    for otpl_file in config.text_files:
+        segment_file_names.extend(segment_otpl_file(otpl_file, args.segment, config.encoding))
+
+    config.text_files = segment_file_names
+
 sys.exit(otpl_to_text(config))
