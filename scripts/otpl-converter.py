@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Convert between the brat and OTPL (one token per line) standoff formats."""
 # The MIT License (MIT)
 #

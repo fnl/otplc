@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Extract the tokens of OTPL (one token per line) files into separate plain-text files."""
 # The MIT License (MIT)
 #
