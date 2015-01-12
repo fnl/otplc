@@ -577,7 +577,7 @@ def otpl_to_brat(configuration):
     if configuration.name_labels is not None:
         converter.set_name_dict(configuration.name_labels)
 
-    for text_file in configuration.text_files:
+    for text_file in configuration.input_files:
         otpl_file = make_path_to(text_file, configuration.otpl_suffix)
         brat_file = make_path_to(text_file, configuration.brat_suffix)
 
@@ -600,7 +600,7 @@ def otpl_to_brat(configuration):
             errors += 1
 
     if not errors:
-        brat_config_file = join(dirname(configuration.text_files[-1]), configuration.config)
+        brat_config_file = join(dirname(configuration.input_files[-1]), configuration.config)
 
         if not exists(brat_config_file):
             converter.write_config_file(brat_config_file)

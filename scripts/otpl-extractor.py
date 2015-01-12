@@ -91,9 +91,9 @@ config.separator = args.separator
 if args.segment > 0:
     segment_file_names = []
 
-    for otpl_file in config.text_files:
+    for otpl_file in config.input_files:
         segment_file_names.extend(segment_otpl_file(otpl_file, args.segment, config.encoding))
 
-    config.text_files = segment_file_names
+    config.input_files = segment_file_names
 
 sys.exit(otpl_to_text(config))

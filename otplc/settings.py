@@ -31,13 +31,13 @@ class Configuration(object):
             assert exists(path), 'file "%s" does not exist' % path
 
         assert input_files, 'no input files'
-        self.text_files = input_files
+        self.input_files = input_files # input files
         self.brat_suffix = Configuration.BRAT_SUFFIX
         self.otpl_suffix = Configuration.OTPL_SUFFIX
         self.text_suffix = Configuration.TEXT_SUFFIX
-        self.config = Configuration.CONFIG
-        self.encoding = Configuration.ENCODING
-        self.filter = None
-        self.colspec = None
-        self.separator = None
-        self.name_labels = None
+        self.config = Configuration.CONFIG # configuation file name
+        self.encoding = Configuration.ENCODING # character encoding of all files
+        self.filter = None # filter regex (skip matching lines)
+        self.colspec = None # column specification for OTPL files
+        self.separator = None # column separator for OTPL files
+        self.name_labels = None  # translations for annotations in the conversion process

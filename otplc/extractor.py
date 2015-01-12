@@ -67,9 +67,9 @@ def otpl_to_text(configuration):
     """
     errors = 0
 
-    for otpl_file in configuration.text_files:
+    for otpl_file in configuration.input_files:
         text_file = make_path_to(otpl_file, configuration.text_suffix)
-        msg = "text file and OTPL file have the same path " \
+        msg = "output text file and input OTPL file have the same path " \
               "(ensure the OTPL file does not use the extension '{}')"
         assert otpl_file != text_file, msg.format(configuration.text_suffix)
         segments = configure_reader(otpl_file, configuration)
