@@ -44,8 +44,9 @@ parser.add_argument('files', metavar='FILE', nargs='+',
                     help='the (annotated) UTF-8 plain-text file(s)')
 parser.add_argument('--filter', metavar='REGEX',
                     help='filter (skip) lines in input annotation file matching REGEX [none]')
-parser.add_argument('--name-labels', metavar='REGEX',
-                    help='mappings defined like visual.conf labels ("brat | otpl") [none]')
+parser.add_argument('--name-labels', metavar='FILE',
+                    help='mappings for labels (in brat\'s visual.conf format: '
+                         '"brat_label | otpl_label"; see OTPLC\'s data directory for examples)')
 
 # OTPL-specific options
 parser.add_argument('--otpl-suffix', metavar='SUFFIX', default=Configuration.OTPL_SUFFIX,
@@ -93,9 +94,7 @@ if args.colspec:
 if args.name_labels:
     mappings = {}
 
-    for raw in open(args.name_labels, 'rU'):
-        line = raw.decode('utf-8')
-
+    for line in open(args.name_labels, encoding=config.encoding):
         if " | " in line:
             name, label = line.split(' | ', 1)
             mappings[label.strip()] = name.strip()

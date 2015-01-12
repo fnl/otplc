@@ -1,0 +1,21 @@
+# Translation scheme for Penn tags with non-alphanumeric characters to tags brat can handle.
+CURR  | $
+TERM  | .
+COMMA | ,
+COLON | :
+NUM   | #
+LQM   | ``
+RQM   | ''
+QM    | "
+DASH  | -
+DASH  | --
+LB    | (
+LRB   | -LRB-
+LSB   | -LSB-
+LCB   | -LCB-
+RB    | )
+RRB   | -RRB-
+RSB   | -RSB-
+RCB   | -RCB-
+PRPp  | PRP$
+WPp   | WP$
