@@ -99,7 +99,7 @@ class TestReader(OtplTestBase):
             u"GLOBAL_ENUM _UNKNOWN LOCAL_ENUM TOKEN"
         )
         # assert count == 2 because of the "one last round" guess:
-        self.test_log.assertMatches(u'at column %s: already detected two enumeration columns',
+        self.test_log.assertMatches(u'at column %s: already detected two enum columns',
                                     args=(3,), count=2)
 
     def testGuessColspecDependecy(self):

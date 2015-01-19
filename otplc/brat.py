@@ -1,9 +1,9 @@
 """
 A clear and Unicode-aware implementation of the brat annotation type system.
-All annotation types provide a class-method ``from_string`` to parse a Unicode string and
-return the corresponding type object.
-And all types can be transformed to Unicode strings (:func:`str`) or be serialized to bytes
-(:func:`bytes`) in UTF-8 encoding.
+All annotation types provide a class-method ``from_string`` to parse a Unicode
+string and return the corresponding type object.
+And all types can be transformed to Unicode strings (:func:`str`) or be
+serialized to bytes (:func:`bytes`) in UTF-8 encoding.
 """
 from logging import getLogger
 import os
@@ -16,7 +16,8 @@ L = getLogger('otplc.brat')
 class _Annotation:
 
     """
-    All annotation types are guaranteed to provide a ``uid`` and ``name`` attribute.
+    All annotation types are guaranteed to provide a ``uid`` and ``name``
+    attribute.
     """
 
     @classmethod
@@ -48,7 +49,8 @@ class _Annotation:
 class _Text(_Annotation):
 
     """
-    All text types in addition to ``uid`` and ``name`` have a ``text`` attribute.
+    All text types in addition to ``uid`` and ``name`` have a ``text``
+    attribute.
     """
 
     @classmethod
@@ -66,9 +68,11 @@ class _Text(_Annotation):
 class _Association(_Annotation):
 
     """
-    All association types in addition to ``uid`` and ``name`` have an ``args`` attribute.
+    All association types in addition to ``uid`` and ``name`` have an ``args``
+    attribute.
 
-    These arguments are dictionaries holding argument type to target ID mappings.
+    These arguments are dictionaries holding argument type to target ID
+    mappings.
     """
 
     @classmethod
@@ -79,12 +83,16 @@ class _Association(_Annotation):
 
     def __init__(self, uid, name, **args):
         super(_Association, self).__init__(uid, name)
-        self.args = dict(args['args']) if len(args) == 1 and 'args' in args else args
+        self.args = dict(args['args']) if (
+            len(args) == 1 and 'args' in args
+        ) else args
 
     @property
     def _args_str(self):
         # sorted arg:target string (to ensure equal reproducibility)
-        return ' '.join('%s:%s' % arg_target for arg_target in sorted(self.args.items()))
+        return ' '.join(
+            '%s:%s' % arg_target for arg_target in sorted(self.args.items())
+        )
 
 
 class Entity(_Text):
@@ -107,7 +115,9 @@ class Entity(_Text):
         assert len(text) == self.end - self.start, 'text and offsets mismatch'
 
     def __str__(self):
-        return "%s\t%s %d %d\t%s" % (self.uid, self.name, self.start, self.end, self.text)
+        return "%s\t%s %d %d\t%s" % (
+            self.uid, self.name, self.start, self.end, self.text
+        )
 
     def __eq__(self, other):
         return isinstance(other, Entity) and super(Entity, self).__eq__(other)
@@ -132,7 +142,8 @@ class Normalization(_Text):
         return Normalization(uid, target, db, xref, text)
 
     def __init__(self, uid, target, db, xref, text=None):
-        super(Normalization, self).__init__(uid, 'Reference', text if text else xref)
+        super(Normalization, self).__init__(uid, 'Reference',
+                                            text if text else xref)
         self.db = db
         self.xref = xref
         self.target = target
@@ -142,7 +153,8 @@ class Normalization(_Text):
                                                self.db, self.xref, self.text)
 
     def __eq__(self, other):
-        return isinstance(other, Normalization) and super(Normalization, self).__eq__(other)
+        return isinstance(other, Normalization) and \
+               super(Normalization, self).__eq__(other)
 
 
 class Note(_Text):
@@ -172,7 +184,8 @@ class Relation(_Association):
     """
     An association type with exactly two (entity or association) ``args``.
 
-    The ``"Arg1:"`` and ``"Arg2:"`` prefixes do not have to be part of `target1` and `target2`;
+    The ``"Arg1:"`` and ``"Arg2:"`` prefixes do not have to be part of
+    `target1` and `target2`;
     The argument type specifiers are automatically prepended.
     If any other prefixes are used, they are removed.
     """
@@ -193,7 +206,8 @@ class Relation(_Association):
         return "%s\t%s %s" % (self.uid, self.name, self._args_str)
 
     def __eq__(self, other):
-        return isinstance(other, Relation) and super(Relation, self).__eq__(other)
+        return isinstance(other, Relation) and \
+               super(Relation, self).__eq__(other)
 
 
 class Event(_Association):
@@ -217,7 +231,9 @@ class Event(_Association):
         self.trigger = trigger
 
     def __str__(self):
-        return "%s\t%s:%s %s" % (self.uid, self.name, self.trigger, self._args_str)
+        return "%s\t%s:%s %s" % (
+            self.uid, self.name, self.trigger, self._args_str
+        )
 
     def __eq__(self, other):
         return isinstance(other, Event) and super(Event, self).__eq__(other)
@@ -257,7 +273,8 @@ class Attribute(_Annotation):
         """uid``\\t``name`` ``target[`` ``modifier]"""
         uid, name, target = super(Attribute, cls)._parse(line)
         # split off the value if there is one, otherwise use ``None`` as value:
-        target, modifier = target.split(' ', 1) if ' ' in target else (target, None)
+        target, modifier = target.split(' ', 1) if ' ' in target else \
+            (target, None)
         return Attribute(uid, name, target, modifier)
 
     def __init__(self, uid, name, target, modifier=None):
@@ -270,7 +287,8 @@ class Attribute(_Annotation):
         return "%s\t%s %s%s" % (self.uid, self.name, self.target, value)
 
     def __eq__(self, other):
-        return isinstance(other, Attribute) and super(Attribute, self).__eq__(other)
+        return isinstance(other, Attribute) and \
+               super(Attribute, self).__eq__(other)
 
 
 _PARSE = {
@@ -293,21 +311,23 @@ _ERROR_REASON = {
 }
 
 
-def read(file_path, filter=None, strict=False, encoding='utf-8', **open_args):
+def read(file_path, skip=None, strict=False, encoding='utf-8', **open_args):
     """
-    Yield annotation instances by parse a brat annotation file.
+    Yield annotation instances by parsing a brat annotation file.
 
     Any lines that cannot be parsed are skipped (see `strict`).
 
     :param file_path: the file to read
-    :param filter: a compiled regex pattern; any input line that matches is skipped
-    :param strict: re-raise errors instead of skipping annotations that cannot be parsed
+    :param skip: a compiled regex pattern; any input line that matches is
+                 filtered
+    :param strict: re-raise errors instead of skipping annotations that cannot
+                   be parsed
     :param encoding: for :func:`open`
     :param open_args: for :func:`open`
     :return: a generator for :class:`_Annotation` instances
     :raises IOError: if there is a "technical" problem opening/reading the file
     """
-    skip = _makeFilterFunction(filter)
+    skip = _make_filter_function(skip)
 
     with open(file_path, encoding=encoding, **open_args) as file:
         for lno, raw in enumerate(file, 1):
@@ -320,10 +340,10 @@ def read(file_path, filter=None, strict=False, encoding='utf-8', **open_args):
                     # noinspection PyCallingNonCallable
                     yield _PARSE[annotation_type](line)
                 except (ValueError, TypeError, KeyError, Exception) as error:
-                    _handleError(error, file_path, line, lno, strict)
+                    _handle_error(error, file_path, line, lno, strict)
 
 
-def _handleError(error, file_path, line, lno, strict):
+def _handle_error(error, file_path, line, lno, strict):
     error_args = (lno, file_path, line)
 
     try:
@@ -335,11 +355,11 @@ def _handleError(error, file_path, line, lno, strict):
         raise error
 
 
-def _makeFilterFunction(filter):
+def _make_filter_function(regex):
     return (
         lambda line: False
-    ) if filter is None else (
-        lambda line: filter.search(line)
+    ) if regex is None else (
+        lambda line: regex.search(line)
     )
 
 

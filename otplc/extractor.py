@@ -13,7 +13,8 @@ L = getLogger('otplc.extractor')
 
 def segment_otpl_file(otpl_file, factor, encoding):
     """
-    Split a OTPL file into smaller ones, placing at most `factor` segments in each.
+    Split a OTPL file into smaller ones, placing at most `factor` segments in
+    each.
 
     :param otpl_file: The OTPL file to split.
     :param factor: The split factor; should be a positive integer.
@@ -24,7 +25,9 @@ def segment_otpl_file(otpl_file, factor, encoding):
     basename, extension = splitext(otpl_file)
     segment_file_names = []
     segment_count = 0
-    out_stream = _new_segment_file(basename, len(segment_file_names), extension, encoding)
+    out_stream = _new_segment_file(
+        basename, len(segment_file_names), extension, encoding
+    )
     segment_file_names.append(out_stream.name)
 
     with open(otpl_file, encoding=encoding) as in_stream:
@@ -37,8 +40,9 @@ def segment_otpl_file(otpl_file, factor, encoding):
 
                 if segment_count == factor:
                     out_stream.close()
-                    out_stream = _new_segment_file(basename, len(segment_file_names), extension,
-                                                   encoding)
+                    out_stream = _new_segment_file(
+                        basename, len(segment_file_names), extension, encoding
+                    )
                     segment_file_names.append(out_stream.name)
                     segment_count = 0
             else:
@@ -52,15 +56,18 @@ def segment_otpl_file(otpl_file, factor, encoding):
 
 
 def _new_segment_file(basename, segment_id, extension, encoding):
-    """Open a new file for the given basename, segment_id, and extension (with leading dot)."""
+    """
+    Open a new file for the given basename, segment_id, and extension (with
+    leading dot).
+    """
     out_file = "%s-%i%s" % (basename, segment_id, extension)
     return open(out_file, encoding=encoding, mode='wt')
 
 
 def otpl_to_text(configuration):
     """
-    Extract the text using the tokens of the OTPL files and store the results into separate
-    plain-text files.
+    Extract the text using the tokens of the OTPL files and store the results
+    into separate plain-text files.
 
     :param configuration: a :class:`otplc.settings.Configuration` object
     :return: The number of failed conversion for the input files.
@@ -84,11 +91,14 @@ def otpl_to_text(configuration):
         token = configuration.colspec.token
 
         try:
-            with open(text_file, encoding=configuration.encoding, mode='wt') as out_stream:
+            with open(text_file,
+                      encoding=configuration.encoding,
+                      mode='wt') as out_stream:
                 for seg in segments:
                     print(*[row[token] for row in seg], file=out_stream)
         except IOError as e:
-            L.error('I/O error while extracting %s to %s: %s', otpl_file, text_file, str(e))
+            L.error('I/O error while extracting %s to %s: %s',
+                    otpl_file, text_file, str(e))
             errors += 1
 
     return errors

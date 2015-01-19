@@ -21,16 +21,18 @@ A_VALID_NAME = compile(r'^[\w-]+$')
 class OtplBratConverter:
 
     """
-    A class that, given a column specification, can convert a OTPL standoff annotation file
-    and write a brat standoff annotation file given the (underlying) text file.
+    A class that, given a column specification, can convert a OTPL standoff
+    annotation file and write a brat standoff annotation file given the
+    (underlying) text file.
 
-    To use this class, you first initialize an instance and pass it a OTPL column specification
-    (colspec) using :meth:`.set_colspec`.
+    To use this class, you first initialize an instance and pass it a OTPL
+    column specification (colspec) using :meth:`.set_colspec`.
     That colspec is then used for the conversion with :meth:`.convert`.
-    For each text file, :meth:`convert` directly reads the OTPL file and writes the brat
-    annotation file.
-    After all files have been converted, :meth:`.write_config_file` can be used to write
-    the brat annotation configuration setup using the detected names ("brat annotation types").
+    For each text file, :meth:`convert` directly reads the OTPL file and writes
+    the brat annotation file.
+    After all files have been converted, :meth:`.write_config_file` can be used
+    to write the brat annotation configuration setup using the detected names
+    ("brat annotation types").
     """
 
     NORMALIZATION_LINE = '# %s\t<URL>:http://example.com/, <URLBASE>:http://example.com/%%s\n'
@@ -43,32 +45,36 @@ class OtplBratConverter:
         self._text = None  # the str text string that is being annotated
         self._name_dict = {}  # a remapping of annotation names
 
-        self._resetStates()  # states for OTPL parsing
+        self._reset_states()  # states for OTPL parsing
 
         # capture a few names to write a rudimentary brat config file:
         self._entities = dict()  # {name: None}
         self._relations = defaultdict(set)  # {name: {column}}
         # only the argument position is used in the list of events;
         # the Boolean value indicates if the argument is required;
-        # that is, if the argument (a reference in its column) was observed for all events:
+        # that is, if the argument (a reference in its column)
+        # was observed for all events:
         self._events = dict()  # will be: {name: [(column, bool)]}
-        # only stored as reference (normalizations have to be configured in tools.conf):
+        # only stored as reference
+        # (normalizations have to be configured in tools.conf):
         self._normalizations = set()  # {namespace}
         # the default modifier added (if absent) is ``True``:
-        self._attributes = defaultdict(lambda: (set(), set()))  # {name: ({modifier}, {column})}
+        self._attributes = defaultdict(lambda: (set(), set()))
+        # {name: ({modifier}, {column})}
 
     def set_name_dict(self, name_dict):
         """
         Define a name-to-labels mapping to avoid illegal brat names.
 
         In brat, names must follow the pattern ``/^[\w-]+$/``.
-        If not, the annotation is ignored by the system and this conversion process skips the
-        annotation.
-        Therefore, with this mapping, such problematic names can be re-mapped to valid brat
-        names, while the original name still can be shown in the interface if the same mapping
-        is defined in the labels_ section of the brat ``visual.conf`` file.
-        (Therefore, the command-line tool knows how to extract any such mapping from
-        ``visual.conf``.)
+        If not, the annotation is ignored by the system and this conversion
+        process skips the annotation.
+        Therefore, with this mapping, such problematic names can be re-mapped
+        to valid brat names, while the original name still can be shown in the
+        interface if the same mapping is defined in the labels_ section of the
+        brat ``visual.conf`` file.
+        (Therefore, the command-line tool knows how to extract any such mapping
+        from ``visual.conf``.)
 
         .. _labels: http://brat.nlplab.org/configuration.html#visual-configuration
 
@@ -78,7 +84,8 @@ class OtplBratConverter:
 
     def set_colspec(self, otpl_colspec):
         """
-        Define the :class:`otplc.colspec.ColumnSpecification` the OTPL input files follow.
+        Define the :class:`otplc.colspec.ColumnSpecification` the OTPL input
+        files follow.
 
         :type otpl_colspec: otplc.colspec.ColumnSpecification
         """
@@ -86,13 +93,15 @@ class OtplBratConverter:
 
     def convert(self, segments, text_file, brat_file=None):
         """
-        Read an input `OTPL file` and write a `brat file` for a given `text file`.
+        Read an input `OTPL file` and write a `brat file` for a given `text
+        file`.
 
         Note that the whole text file will be read into memory.
 
         :param segments: a :class:`OtplReader` instance
         :param text_file: the path to the annotated (plain-) text file
-        :param brat_file: the path to the brat file (by default determined by suffix replacement)
+        :param brat_file: the path to the brat file (by default determined by
+                          suffix replacement)
         :return: True if successful, False otherwise
         """
         if self._colspec is None:
@@ -104,14 +113,14 @@ class OtplBratConverter:
 
         L.info('"%s" to "%s" using "%s"', segments.path, brat_file, text_file)
         self._text = open(text_file, encoding='utf-8').read()
-        self._resetStates()
+        self._reset_states()
 
         # NB: processing order is significant to resolve references
         try:
             if self._colspec.has_global_refs():
-                self._convertWithGlobals(segments, brat_file)
+                self._convert_with_globals(segments, brat_file)
             else:
-                self._convertLocal(segments, brat_file)
+                self._convert_local(segments, brat_file)
         except (ValueError, DataFormatError) as e:
             L.warning('failed - %s', str(e))
             return False
@@ -122,22 +131,25 @@ class OtplBratConverter:
         """ Write the annotation.conf file in the given location. """
         with open(file_path, 'wb') as self._config_file:
             if self._entities:
-                self._writeConfigFor('entities', self._entities.items(), self._writeEntityType)
+                self._write_config_for('entities', self._entities.items(),
+                                       self._write_entity_type)
 
             if self._relations:
-                self._writeConfigFor('relations', self._relations.items(), self._writeRelationType)
+                self._write_config_for('relations', self._relations.items(),
+                                       self._write_relation_type)
 
             if self._events:
-                self._writeConfigFor('events', self._events.items(), self._writeEventType)
+                self._write_config_for('events', self._events.items(),
+                                       self._write_event_type)
 
             if self._attributes:
-                self._writeConfigFor('attributes', self._attributes.items(),
-                                     self._writeAttributeType)
+                self._write_config_for('attributes', self._attributes.items(),
+                                       self._write_attribute_type)
 
             if self._normalizations:
-                self._storeDatabaseNames()
+                self._store_database_names()
 
-    def _resetStates(self):
+    def _reset_states(self):
         """ Per-file parse states. """
         # brat ID counters
         self._entity_counter = count(1)
@@ -152,23 +164,24 @@ class OtplBratConverter:
         self.__line_count = 1
         self._local_map = dict()
 
-    def _convertLocal(self, segments, brat_file):
+    def _convert_local(self, segments, brat_file):
         offset = 0
 
         with open(brat_file, 'wt') as self._annotation_file:
             for seg in segments:
-                unused, offset = self._convertTokensAndEntities(seg, offset)
-                self._convertAnnotations(seg)
+                unused, offset = self._convert_tokens_and_entities(seg, offset)
+                self._convert_annotations(seg)
                 self.__global_count += len(seg)
                 self.__line_count += len(seg) + 1
 
-    def _convertWithGlobals(self, segments, brat_file):
+    def _convert_with_globals(self, segments, brat_file):
         """
-        If global references are present, they might point to entities in the future
-        (that is, after the end of the current segment),
-        so this approach iteratively creates the targets for the whole OTPL file
-        by reading it twice (once for entities, and once for the other types).
-        In other words, a OTPL file with global references is more expensive to convert.
+        If global references are present, they might point to entities in the
+        future (that is, after the end of the current segment), so this
+        approach iteratively creates the targets for the whole OTPL file by
+        reading it twice (once for entities, and once for the other types).
+        In other words, a OTPL file with global references is more expensive to
+        convert.
         """
         self._global_map = defaultdict(dict)
         offset = 0
@@ -176,7 +189,7 @@ class OtplBratConverter:
 
         with open(brat_file, 'wt+') as self._annotation_file:
             for seg in segments:
-                lmap, offset = self._convertTokensAndEntities(seg, offset)
+                lmap, offset = self._convert_tokens_and_entities(seg, offset)
                 local_maps.append(lmap)
                 self.__global_count += len(seg)
                 self.__line_count += len(seg) + 1
@@ -187,33 +200,35 @@ class OtplBratConverter:
 
             for seg in segments:
                 self._local_map = next(local_maps)
-                self._convertAnnotations(seg)
+                self._convert_annotations(seg)
                 self.__global_count += len(seg)
                 self.__line_count += len(seg) + 1
 
-    def _convertTokensAndEntities(self, segment, start):
+    def _convert_tokens_and_entities(self, segment, start):
         """ Convert the `segment` annotating the text starting at `offset`. """
-        L.debug('global_count=%d line_count=%d', self.__global_count, self.__line_count)
+        L.debug('global_count=%d line_count=%d',
+                self.__global_count, self.__line_count)
         L.debug('text at offset=%s:\n%s...', start,
                 self._text[start:start + 75].replace('\n', ' ').strip())
         L.debug('segment:\n%s', '\n'.join('\t'.join(row) for row in segment))
         self._local_map = defaultdict(dict)
-        offsets = list(self._yieldOffsets(start, segment))
+        offsets = list(self._yield_offsets(start, segment))
         assert len(offsets) == len(segment)
-        self._processPoS(segment, offsets)
-        self._processEntities(segment, offsets)
+        self._process_pos(segment, offsets)
+        self._process_entities(segment, offsets)
         return self._local_map, offsets[-1][-1]
 
-    def _convertAnnotations(self, segment):
-        for columns, makerMethod in [
-            (self._colspec.iter_relations(), self._makeRelation),
-            (self._colspec.iter_events(), self._makeEvent),
-            (self._colspec.iter_normalizations(), self._makeNormalization),
-            (self._colspec.iter_attributes(), self._makeAttribute),
+    def _convert_annotations(self, segment):
+        for columns, maker_method in [
+            (self._colspec.iter_relations(), self._make_relation),
+            (self._colspec.iter_events(), self._make_event),
+            (self._colspec.iter_normalizations(), self._make_normalization),
+            (self._colspec.iter_attributes(), self._make_attribute),
         ]:
-            self._processColumnsWith(segment, columns, makerMethod)
+            OtplBratConverter._process_columns_with(segment, columns,
+                                                    maker_method)
 
-    def _yieldOffsets(self, start, segment):
+    def _yield_offsets(self, start, segment):
         c = self._colspec.token
 
         for idx, row in enumerate(segment):
@@ -225,19 +240,24 @@ class OtplBratConverter:
 
                 if update - start > 1000:
                     L.warning('"%s" found %d chars after "%s..."',
-                              token, update - start, self._text[start:start + len(token) + 10])
+                              token, update - start,
+                              self._text[start:start + len(token) + 10])
 
                 start = update
             except ValueError:
-                content = self._text[start:start + len(token) + 10].replace('\n', '\\n')
-                raise ValueError('token "%s" from line %d not found at "%s" (%d)' % (
-                    token, self.__line_count + idx, content, start
-                ))
+                content = self._text[start:start + len(token) + 10].replace(
+                    '\n', '\\n'
+                )
+                raise ValueError(
+                    'token "%s" from line %d not found at "%s" (%d)' % (
+                        token, self.__line_count + idx, content, start
+                    )
+                )
 
             yield (start, start + length)
             start += length
 
-    def _processPoS(self, segment, offsets):
+    def _process_pos(self, segment, offsets):
         col = self._colspec.pos_tag
 
         if col is not None:
@@ -245,21 +265,23 @@ class OtplBratConverter:
                 val = data[col]
 
                 if val and val != 'NULL':
-                    self._makeEntity([data], idx + 1, col, *offsets[idx])
+                    self._make_entity([data], idx + 1, col, *offsets[idx])
 
-    def _processEntities(self, segment, offsets):
+    def _process_entities(self, segment, offsets):
         for col in self._colspec.iter_entities():
-            rows, start = self._parseBIEO(segment, col, offsets)
+            rows, start = self._parse_bioe(segment, col, offsets)
 
             if rows:
-                self._makeEntity(rows, len(segment) - len(rows), col, start, offsets[-1][-1])
+                self._make_entity(rows, len(segment) - len(rows),
+                                  col, start, offsets[-1][-1])
 
-    def _processColumnsWith(self, segment, column_iter, makeAnnotation):
+    @staticmethod
+    def _process_columns_with(segment, column_iter, make_annotation):
         for col in column_iter:
             for row, data in enumerate(segment, 1):
-                makeAnnotation(data, row, col)
+                make_annotation(data, row, col)
 
-    def _parseBIEO(self, segment, col, offsets):
+    def _parse_bioe(self, segment, col, offsets):
         start, data_rows = 0, []
         row_num = lambda: idx + 1 - len(data_rows)
 
@@ -268,17 +290,20 @@ class OtplBratConverter:
 
             if val.startswith('B-'):
                 if data_rows:
-                    self._makeEntity(data_rows, row_num(), col, start, offsets[idx - 1][-1])
+                    self._make_entity(data_rows, row_num(),
+                                      col, start, offsets[idx - 1][-1])
 
                 start = offsets[idx][0]
                 data_rows = [data]
             elif val.startswith('E-'):
                 if data_rows:
                     data_rows.append(data)
-                    self._makeEntity(data_rows, row_num(), col, start, offsets[idx][-1])
+                    self._make_entity(data_rows, row_num(),
+                                      col, start, offsets[idx][-1])
                     data_rows = []
                 else:
-                    self._makeEntity([data], row_num(), col, *offsets[idx])
+                    self._make_entity([data], row_num(),
+                                      col, *offsets[idx])
             elif val.startswith('I-'):
                 if not data_rows:  # start of IEO tags
                     start = offsets[idx][0]
@@ -287,21 +312,23 @@ class OtplBratConverter:
                 data_rows.append(data)
             elif val == 'O':
                 if data_rows:
-                    self._makeEntity(data_rows, row_num(), col, start, offsets[idx - 1][-1])
+                    self._make_entity(data_rows, row_num(),
+                                      col, start, offsets[idx - 1][-1])
                     data_rows = []
             else:
                 L.warning('bad BIO entity tag: "%s"', val)
 
         return data_rows, start
 
-    def _makeEntity(self, rows, row_num, col, start, end):
+    def _make_entity(self, rows, row_num, col, start, end):
         pos_col = self._colspec.pos_tag
         off = 0 if col == pos_col else 2
 
         try:
-            name = self._validateName(rows[0][col][off:])
+            name = self._validate_name(rows[0][col][off:])
         except IndexError:
-            L.error('could not detect the entity name at col=%s, off=%s in %s', col, off, rows)
+            L.error('could not detect the entity name at col=%s, off=%s in %s',
+                    col, off, rows)
             return
         except DataFormatError:
             L.error('brat cannot cope with entity name "%s" in column %d',
@@ -309,22 +336,26 @@ class OtplBratConverter:
             return
 
         if col != pos_col:
-            assert all(r[col][2:] == name for r in rows), [r[col] for r in rows]
+            assert all(
+                r[col][2:] == name for r in rows
+            ), [r[col] for r in rows]
 
         uid = self._register(col, 'T', self._entity_counter, row_num, *rows)
 
         if name not in self._entities:
             self._entities[name] = None
 
-        self._storeAnnotation(brat.Entity(uid, name, start, end, self._text[start:end]))
+        self._store_annotation(brat.Entity(uid, name, start, end,
+                                           self._text[start:end]))
 
-    def _makeNormalization(self, data, row_num, col):
+    def _make_normalization(self, data, row_num, col):
         ns_id = data[col]
 
         if ns_id and ns_id != 'NULL':
             target_col = self._colspec.get_normalization_target(col)
-            target_id = self._getLocalTargetID(target_col, data, row_num)
-            uid = self._register(col, 'N', self._normalization_counter, row_num, data)
+            target_id = self._get_local_target_id(target_col, data, row_num)
+            uid = self._register(col, 'N', self._normalization_counter,
+                                 row_num, data)
             string = ns_id
 
             if ' ' in ns_id:
@@ -333,76 +364,93 @@ class OtplBratConverter:
             db, xref = ns_id.split(':', 1)
 
             try:
-                self._validateName(db)
+                self._validate_name(db)
             except DataFormatError:
-                L.error('brat cannot cope with DB name "%s" in column %d', db, col + 1)
+                L.error('brat cannot cope with DB name "%s" in column %d',
+                        db, col + 1)
                 return
 
             self._normalizations.add(db)  # DB namespace only
-            self._storeAnnotation(brat.Normalization(uid, target_id, db, xref, string))
+            self._store_annotation(brat.Normalization(uid, target_id, db,
+                                                      xref, string))
 
-    def _makeRelation(self, data, row_num, col):
+    def _make_relation(self, data, row_num, col):
         name = data[col]
         ref_col = col - 1
 
         if data[ref_col] and name and data[ref_col] != '0' and name != 'NULL':
             try:
-                name = self._validateName(name)
+                name = self._validate_name(name)
             except DataFormatError:
-                L.error('brat cannot cope with relation name "%s" in column %d', name, col + 1)
+                L.error(
+                    'brat cannot cope with relation name "%s" in column %d',
+                    name, col + 1
+                )
                 return
 
-            uid = self._register(col, 'R', self._relation_counter, row_num, data)
+            uid = self._register(col, 'R', self._relation_counter, row_num,
+                                 data)
             source_col = self._colspec.get_relation_target(col)
-            source_id = self._getLocalTargetID(source_col, data, row_num)
-            target_id = self._getReferencedID(data, ref_col)
+            source_id = self._get_local_target_id(source_col, data, row_num)
+            target_id = self._get_referenced_id(data, ref_col)
             self._relations[name].add(col)
-            self._storeAnnotation(brat.Relation(uid, name, source_id, target_id))
+            self._store_annotation(brat.Relation(uid, name,
+                                                 source_id, target_id))
 
-    def _makeEvent(self, data, row_num, col):
+    def _make_event(self, data, row_num, col):
         name = data[col]
         trigger_col, ref_cols = self._colspec.get_event_targets(col)
 
-        if name and name != 'NULL' and data[trigger_col] and data[trigger_col] != '0':
+        if name and name != 'NULL' and \
+                data[trigger_col] and data[trigger_col] != '0':
             try:
-                name = self._validateName(name)
+                name = self._validate_name(name)
             except DataFormatError:
-                L.error('brat cannot cope with event name "%s" in column %d', name, col + 1)
+                L.error('brat cannot cope with event name "%s" in column %d',
+                        name, col + 1)
                 return
 
             uid = self._register(col, 'E', self._event_counter, row_num, data)
-            trigger_id = self._getReferencedID(data, trigger_col)
-            ref_ids = [None if data[c] == '0' else self._getReferencedID(data, c)
-                       for c in ref_cols]
+            trigger_id = self._get_referenced_id(data, trigger_col)
+            ref_ids = [(None if data[c] == '0' else
+                        self._get_referenced_id(data, c)) for c in ref_cols]
             references = dict(('Arg%d' % num, rid)
-                              for num, rid in enumerate(ref_ids, 1) if rid is not None)
-            self._storeEventArguments(name, list(zip(ref_cols, [i is not None for i in ref_ids])))
-            self._storeAnnotation(brat.Event(uid, name, trigger_id, **references))
+                              for num, rid in enumerate(ref_ids, 1)
+                              if rid is not None)
+            self._store_event_arguments(
+                name, list(zip(ref_cols, [i is not None for i in ref_ids]))
+            )
+            self._store_annotation(brat.Event(uid, name, trigger_id,
+                                              **references))
 
-    def _storeEventArguments(self, name, col_req_pairs):
+    def _store_event_arguments(self, name, col_req_pairs):
         if name in self._events:
             existing_pairs = self._events[name]
             is_required = 1  # the second element in the pair; for readability
 
             for idx, new_pair in enumerate(col_req_pairs):
-                if not new_pair[is_required] and existing_pairs[idx][is_required]:
+                if not new_pair[is_required] and \
+                        existing_pairs[idx][is_required]:
                     existing_pairs[idx] = (new_pair[0], False)
         else:
             self._events[name] = col_req_pairs
 
-    def _makeAttribute(self, data, row_num, col):
+    def _make_attribute(self, data, row_num, col):
         name = data[col]
 
         if name and name != 'NULL':
             try:
-                name = self._validateName(name)
+                name = self._validate_name(name)
             except DataFormatError:
-                L.error('brat cannot cope with attribute name "%s" in column %d', name, col + 1)
+                L.error(
+                    'brat cannot cope with attribute name "%s" in column %d',
+                    name, col + 1
+                )
                 return
 
             uid = 'A', + next(self._attribute_counter)
             target_col = self._colspec.get_attribute_target(col)
-            target = self._getLocalTargetID(target_col, data, row_num)
+            target = self._get_local_target_id(target_col, data, row_num)
             modifier = ''
 
             if ' ' in name:
@@ -412,9 +460,9 @@ class OtplBratConverter:
             mods, cols = self._attributes[name]
             mods.add(modifier.rstrip(' ') if modifier else True)
             cols.add(col)
-            self._storeAnnotation(brat.Attribute(uid, name, target, modifier))
+            self._store_annotation(brat.Attribute(uid, name, target, modifier))
 
-    def _storeAnnotation(self, ann):
+    def _store_annotation(self, ann):
         self._annotation_file.write(str(ann))
         self._annotation_file.write(os.linesep)
 
@@ -424,114 +472,138 @@ class OtplBratConverter:
         local_enum = self._colspec.local_enum
         base_num = self.__global_count + num
 
-        for idx, data in enumerate(data_items):  # register the uid to each data row
+        # register the uid to each data row
+        for idx, data in enumerate(data_items):
             if self._global_map is not None:
-                global_id = str(base_num + idx) if global_enum is None else data[global_enum]
+                global_id = str(base_num + idx) if global_enum is None else \
+                    data[global_enum]
                 self._global_map[col].setdefault(global_id, uid)
 
-            local_id = str(num + idx) if local_enum is None else data[local_enum]
+            local_id = str(num + idx) if local_enum is None else \
+                data[local_enum]
             self._local_map[col].setdefault(local_id, uid)
 
         return uid
 
-    def _getReferencedID(self, data, ref_col):
+    def _get_referenced_id(self, data, ref_col):
         target_col = self._colspec.get_reference_target(ref_col)
 
         try:
             if self._colspec.is_global_ref(ref_col):
-                return self._getGlobalID(target_col, data[ref_col])
+                return self._get_global_id(target_col, data[ref_col])
             else:
-                return self._getLocalID(target_col, data[ref_col])
+                return self._ge_local_id(target_col, data[ref_col])
         except RuntimeError:
             raise ValueError('unresolved reference %d->%d with number %s' % (
                 ref_col + 1, target_col + 1, data[ref_col]
             ))
 
-    def _getLocalTargetID(self, target_col, data, row_num):
-        row = str(row_num) if self._colspec.local_enum is None else data[self._colspec.local_enum]
+    def _get_local_target_id(self, target_col, data, row_num):
+        row = str(row_num) if self._colspec.local_enum is None else \
+            data[self._colspec.local_enum]
 
         try:
-            return self._getLocalID(target_col, row)
+            return self._ge_local_id(target_col, row)
         except RuntimeError:
             raise ValueError(
-                'unresolved local target column %d with number %s' % (target_col + 1, row)
+                'unresolved local target column %d with number %s' % (
+                    target_col + 1, row
+                )
             )
 
-    def _getLocalID(self, col, num):
-        return self.__getID(col, num, self._local_map)
+    def _ge_local_id(self, col, num):
+        return OtplBratConverter.__get_id(col, num, self._local_map)
 
-    def _getGlobalID(self, col, num):
-        return self.__getID(col, num, self._global_map)
+    def _get_global_id(self, col, num):
+        return OtplBratConverter.__get_id(col, num, self._global_map)
 
-    def __getID(self, col, num, mapping):
+    @staticmethod
+    def __get_id(col, num, mapping):
         if num in mapping[col]:
             return mapping[col][num]
         else:
             raise RuntimeError('unknown num=%s in column=%s' % (num, col))
 
-    def _writeConfigFor(self, section, collection, writeConfig):
-        """ Write the collection of names for a section to the configuration file. """
-        self._storeConfiguration('\n[%s]\n\n' % section)
+    def _write_config_for(self, section, collection, write_config):
+        """
+        Write the collection of names for a section to the configuration file.
+        """
+        self._store_configuration('\n[%s]\n\n' % section)
 
         for name, data in sorted(collection):
-            writeConfig(name, data)
+            write_config(name, data)
 
-    def _writeEntityType(self, name, unused):
+    def _write_entity_type(self, name, _):
         """ Write the entity name, None pair to the configuration file. """
-        self._storeConfiguration('%s\n' % name)
+        self._store_configuration('%s\n' % name)
 
-    def _writeRelationType(self, name, columns):
-        """ Write the relation name, columns pair to the configuration file. """
-        self._storeConfiguration('%s\t' % name)
+    def _write_relation_type(self, name, columns):
+        """
+        Write the relation name, columns pair to the configuration file.
+        """
+        self._store_configuration('%s\t' % name)
 
-        target1 = self._elicitShortcutFor(
+        target1 = self._elicit_shortcut_for(
             columns, self._colspec.get_relation_target
         )
-        target2 = self._elicitShortcutFor(
+        target2 = self._elicit_shortcut_for(
             columns, lambda c: self._colspec.get_reference_target(c - 1)
         )
-        self._storeConfiguration('Arg1:%s, Arg2:%s\n' % (target1, target2))
+        self._store_configuration('Arg1:%s, Arg2:%s\n' % (target1, target2))
 
-    def _writeEventType(self, name, pairs):
+    def _write_event_type(self, name, pairs):
         """ Write the event name, pairs pair to the configuration file. """
-        self._storeConfiguration('%s\t' % name)
+        self._store_configuration('%s\t' % name)
         arguments = []
 
         for col, req in pairs:
-            shortcut = self._elicitShortcutFor([col], self._colspec.get_reference_target)
+            shortcut = self._elicit_shortcut_for(
+                [col], self._colspec.get_reference_target
+            )
             arguments.append('Col%d%s:%s' % (
                 col + 1, '' if req else '?', shortcut
             ))
 
-        self._storeConfiguration(', '.join(arguments))
-        self._storeConfiguration('\n')
+        self._store_configuration(', '.join(arguments))
+        self._store_configuration('\n')
 
-    def _writeAttributeType(self, name, values):
-        """ Write the attribute name, values pair to the configuration file. """
-        modifiers = '' if len(values[0]) == 1 else ', Value:%s' % '|'.join(values[0])
-        shortcut = self._elicitShortcutFor(values[1], self._colspec.get_attribute_target)
-        self._storeConfiguration('%s\tArg:%s%s\n' % (name, shortcut, modifiers))
+    def _write_attribute_type(self, name, values):
+        """
+        Write the attribute name, values pair to the configuration file.
+        """
+        modifiers = '' if len(values[0]) == 1 else \
+            ', Value:%s' % '|'.join(values[0])
+        shortcut = self._elicit_shortcut_for(
+            values[1], self._colspec.get_attribute_target
+        )
+        self._store_configuration(
+            '%s\tArg:%s%s\n' % (name, shortcut, modifiers)
+        )
 
-    def _storeDatabaseNames(self):
-        self._storeConfiguration('\n# [normalization]\n')
+    def _store_database_names(self):
+        self._store_configuration('\n# [normalization]\n')
 
         for name in self._normalizations:
             try:
-                name = self._validateName(name)
-                self._storeConfiguration(OtplBratConverter.NORMALIZATION_LINE % name)
+                name = self._validate_name(name)
+                self._store_configuration(
+                    OtplBratConverter.NORMALIZATION_LINE % name
+                )
             except DataFormatError:
                 L.warning('database name "%s" has illegal characters', name)
-                self._storeConfiguration('# %s\n' % name)
+                self._store_configuration('# %s\n' % name)
 
-    def _storeConfiguration(self, string):
+    def _store_configuration(self, string):
         self._config_file.write(string.encode('utf-8'))
 
-    def _elicitShortcutFor(self, cols, targetColumn):
+    def _elicit_shortcut_for(self, cols, get_target_column):
         """ Establish the best shortcut name for the configuration file. """
         coltype = None
 
         for c in cols:
-            update = self._colspec.get_property_target_column_type(targetColumn(c))
+            update = self._colspec.get_property_target_column_type(
+                get_target_column(c)
+            )
 
             if coltype is None:
                 coltype = update
@@ -552,7 +624,7 @@ class OtplBratConverter:
                 'illegal shortcut %s for %s' % (str(coltype), str(cols))
             )
 
-    def _validateName(self, name):
+    def _validate_name(self, name):
         if name in self._name_dict:
             name = self._name_dict[name]
 
@@ -564,8 +636,8 @@ class OtplBratConverter:
 
 def otpl_to_brat(configuration):
     """
-    For a list of `text_files` (paths), read the associated OTPL files and write the converted
-    brat files.
+    For a list of `text_files` (paths), read the associated OTPL files and
+    write the converted brat files.
 
     :type configuration: Configuration
     :return: the error count (number of failed conversions)
@@ -596,17 +668,20 @@ def otpl_to_brat(configuration):
                 L.error('conversion for "%s" failed', text_file)
                 errors += 1
         else:
-            L.error('could not locate OTPL file "%s" for "%s"', otpl_file, text_file)
+            L.error('could not locate OTPL file "%s" for "%s"',
+                    otpl_file, text_file)
             errors += 1
 
     if not errors:
-        brat_config_file = join(dirname(configuration.input_files[-1]), configuration.config)
+        brat_config_file = join(dirname(configuration.input_files[-1]),
+                                configuration.config)
 
         if not exists(brat_config_file):
             converter.write_config_file(brat_config_file)
 
     if errors:
-        L.debug('conversion of %s file%s failed', errors, '' if errors == 1 else 's')
+        L.debug('conversion of %s file%s failed',
+                errors, '' if errors == 1 else 's')
 
     return errors
 

@@ -1,11 +1,14 @@
 """
 OTPL files must match the following specifications:
 
-Segments (usually, sentences) must be separated by *empty* lines (containing no character at all).
-Each row must have the same number of columns (except empty-line segment separators).
-Linebreaks may be encoded as either ``\\n`` (UNIX), ``\\r`` (Mac) or ``\\r\\n`` (Windows).
-The first line and segment (i.e., terminated by two line-breaks) can be a column specification
-(colspec; see below).
+Segments (usually, sentences) must be separated by *empty* lines (containing no
+character at all).
+Each row must have the same number of columns (except empty-line segment
+separators).
+Linebreaks may be encoded as either ``\\n`` (UNIX), ``\\r`` (Mac) or ``\\r\\n``
+(Windows).
+The first line and segment (i.e., terminated by two line-breaks) can be a
+column specification (colspec; see below).
 Inline comments are not allowed; please prune your data first.
 The overall column structure must be:
 
@@ -14,8 +17,8 @@ The overall column structure must be:
    - zero or one *global* **enumeration** (integer), and
    - zero or one (segment-) *local* **enumeration** (integer).
 2. Exactly one **token** (string) column.
-3. Any number of **annotation** (string) or **reference** (to a [possibly implicit] local or
-   global enumeration).
+3. Any number of **annotation** (string) or **reference** (to a [possibly
+implicit] local or global enumeration).
 
 The *colspec* Header
 --------------------
@@ -26,33 +29,35 @@ A complete such **column specification header** example might be::
 
     SEGMENT_ID TOKEN POS_TAG LOCAL_REF RELATION ENTITY LOCAL_REF:5 LOCAL_REF:9 EVENT
 
-In this case, the event trigger points to the relation, not to the entity,
-and the first (and only) argument points at the event itself.
-(Without those redirections, the event references would be pointing at the entity.)
-It is important to realize that these redirections require their manual specification and
-therefore such colspecs should be included as the first line of the file, followed by an empty
-line.
+In this case, the event trigger points to the relation, not to the entity, and
+the first (and only) argument points at the event itself.
+(Without those redirections, the event references would be pointing at the
+entity.)
+It is important to realize that these redirections require their manual
+specification and therefore such colspecs should be included as the first line
+of the file, followed by an empty line.
 
-To make **references** and **relations** point to other columns (than the first tag column to
-their left), including to other association columns, a special syntax for the column specification
-(colspec) can be used:
-By appending a colon and a (one-based) count of the target column, it is possible to declare that
-that reference column points to that target.
+To make **references** and **relations** point to other columns (than the first
+tag column to their left), including to other association columns, a special
+syntax for the column specification (colspec) can be used:
+By appending a colon and a (one-based) count of the target column, it is
+possible to declare that that reference column points to that target.
 This target may be either a tag or association column.
-For example, ``GLOBAL_REF:10`` declares that this global reference points at column 10
-(and column 10 must be either a tag or association).
+For example, ``GLOBAL_REF:10`` declares that this global reference points at
+column 10 (and column 10 must be either a tag or association).
 
 OTPL Column Types
 -----------------
 
 **Identifier** columns are all optional.
-**Enumeration** columns are optional and provide unique integer IDs with respect to the
-whole file (global enums) or the current segment/sequence (local enums).
-An optional **SEMGENT_ID** column can be used to identify a segement/sequence, but these IDs
-have no corresponding element in the brat format.
+**Enumeration** columns are optional and provide unique integer IDs with
+respect to the whole file (global enums) or the current segment/sequence
+(local enums).
+An optional **SEMGENT_ID** column can be used to identify a segement/sequence,
+but these IDs have no corresponding element in the brat format.
 
-The required **token** is the (byte-level) exact representation of the token as found in the text
-file.
+The required **token** is the (byte-level) exact representation of the token as
+found in the text file.
 
 **Annotation** columns are classified into the following groups:
 
@@ -60,33 +65,40 @@ file.
 - **Association** (RELATION, EVENT), and
 - **Property** (NORMALIZATION, ATTRIBUTE) columns.
 
-All columns need to follow any specific rules documented in :py:class:`.ColumnSpecification`.
+All columns need to follow any specific rules documented in
+:py:class:`.ColumnSpecification`.
 In addition, the following rules must be obeyed:
 
 * SEGMENT_ID columns can be placed in any position before the token.
 * Undefined values in *annotation* columns should contain the string ``NULL``.
 * Undefined pointers in *reference* columns should contain the integer ``0``.
-* *Associations* by default relate to the first *tag* [column] to their left. By default, they
-  require an (entity or PoS-) tag somewhere to their left, and therefore a tag can have multiple
-  associations (requiring one extra column [set] per association). On the other hand, associations
-  cannot relate to the token itself directly; Only tags can do that.
-* *Properties* always relate to the first *tag* or *association* to their left. E.g., an
-  ATTRIBUTE annotating an ATTRIBUTE is not supported; But having multiple properties per tag
-  or association is (requiring an extra column per property). Therefore, it is illegal to annotate
-  the token itself with a property, just as it is for associations, too.
+* *Associations* by default relate to the first *tag* [column] to their left.
+  By default, they require an (entity or PoS-) tag somewhere to their left, and
+  therefore a tag can have multiple associations (requiring one extra column
+  [set] per association).
+  On the other hand, associations cannot relate to the token itself directly;
+  Only tags can do that.
+* *Properties* always relate to the first *tag* or *association* to their left.
+  E.g., an ATTRIBUTE annotating an ATTRIBUTE is not supported;
+  But having multiple properties per tag or association is (requiring an extra
+  column per property).
+  Therefore, it is illegal to annotate the token itself with a property, just
+  as it is for associations, too.
 
-For **relations**, the *source* tag's row always is the (first) tag (to the left) found
-in the same row as the relationship itself, while the *target* tag's row is identified by the
-relationship's reference column.
+For **relations**, the *source* tag's row always is the (first) tag (to the
+left) found in the same row as the relationship itself, while the *target*
+tag's row is identified by the relationship's reference column.
 
-**Events** by default also reference the first tag to their left, but they are only linked to the
-tag via their two or more reference columns.
-The first column represents the event **trigger**,
-while *each (optional) argument* requires one additional reference column;
+**Events** by default also reference the first tag to their left, but they are
+only linked to the tag via their two or more reference columns.
+The first column represents the event **trigger**, while *each (optional)
+argument* requires one additional reference column;
 Therefore, least one argument column must be defined per event.
 Event arguments can be optional (by setting the reference to ``0``).
-But unlike relations, they do not imply an implicit reference to the *current* tag;
-I.e., the event does not implicitly refer to the tag in the same row as the event.
+But unlike relations, they do not imply an implicit reference to the *current*
+tag;
+I.e., the event does not implicitly refer to the tag in the same row as the
+event.
 """
 from functools import partial
 from logging import getLogger
@@ -98,19 +110,22 @@ L = getLogger('otplc.colspec')
 class ColumnSpecificationMetaClass(type):
 
     """
-    This metaclass populates the column NAMES (to integers) and INTEGERS (to names) dictionaries
-    that can be accessed as class attributes of :py:class:`.ColumnSpecification`.
+    This metaclass populates the column NAMES (to integers) and INTEGERS (to
+    names) dictionaries that can be accessed as class attributes of
+    :py:class:`.ColumnSpecification`.
     """
 
     def __init__(cls, name, bases, namespace):
-        super(ColumnSpecificationMetaClass, cls).__init__(name, bases, namespace)
+        super(ColumnSpecificationMetaClass, cls).__init__(
+            name, bases, namespace
+        )
         cls._NAMES = None
 
     @property
     def NAMES(cls):
         """A column name-to-integer dictionary."""
         if cls._NAMES is None:
-            cls._NAMES = ColumnSpecificationMetaClass._getMapping(cls)
+            cls._NAMES = ColumnSpecificationMetaClass._get_mapping(cls)
 
         return cls._NAMES
 
@@ -118,15 +133,23 @@ class ColumnSpecificationMetaClass(type):
     def INTEGERS(cls):
         """A column integer-to-name dictionary."""
         if not hasattr(cls, '_INTEGERS'):
-            cls._INTEGERS = ColumnSpecificationMetaClass._getMapping(cls, reverse=True)
+            cls._INTEGERS = ColumnSpecificationMetaClass._get_mapping(
+                cls, reverse=True
+            )
 
         return cls._INTEGERS
 
     @staticmethod
-    def _getMapping(cls, reverse=False):
-        makeKeyValuePair = (lambda k, v: (v, k)) if reverse else (lambda k, v: (k, v))
-        return dict([makeKeyValuePair(name, getattr(cls, name)) for name in vars(cls)
-                     if name.isupper() and isinstance(getattr(cls, name), int)])
+    def _get_mapping(cls, reverse=False):
+        make_key_value_pair = (
+            lambda k, v: (v, k)
+        ) if reverse else (
+            lambda k, v: (k, v)
+        )
+        return dict(
+            make_key_value_pair(name, getattr(cls, name)) for name in vars(cls)
+            if name.isupper() and isinstance(getattr(cls, name), int)
+        )
 
 
 class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
@@ -150,13 +173,13 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
     "*Enumeration*: A globally unique integer ID (except 0)."
 
     SEGMENT_ID = 2
-    "SEGMENT_ID: A segment ID (a string that is equal on all rows of a segment)."
+    "SEGMENT_ID: A segment ID (an equal string on all rows of a segment)."
 
     TOKEN = 1
-    "*Token*: The word itself (a string); **required**."
+    "*Token*: The word itself (string); **required**."
 
     POS_TAG = 5
-    "*Annotation/Tag*: The PoS tag (a string); must be placed *immediately* after the token."
+    "*Annotation/Tag*: PoS tag (string); placed *immediately* after the token."
 
     ENTITY = 6
     "*Annotation/Tag*: An entity (all values must start with 'B-', 'E-', or 'I-', or be == 'O')."
@@ -188,10 +211,14 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
     _REFERENCE_COLUMNS = frozenset((LOCAL_ENUM, GLOBAL_ENUM))
     "All reference columns."
 
-    _ANNOTATION_COLUMNS = frozenset((POS_TAG, ENTITY, RELATION, EVENT, NORMALIZATION, ATTRIBUTE))
+    _ANNOTATION_COLUMNS = frozenset(
+        (POS_TAG, ENTITY, RELATION, EVENT, NORMALIZATION, ATTRIBUTE)
+    )
     "All annotation columns."
 
-    _SKIPPED_COLUMNS = frozenset((GLOBAL_REF, LOCAL_REF, ATTRIBUTE, NORMALIZATION, EVENT, RELATION))
+    _SKIPPED_COLUMNS = frozenset(
+        (GLOBAL_REF, LOCAL_REF, ATTRIBUTE, NORMALIZATION, EVENT, RELATION)
+    )
     "All columns that may be (skipped) between an association and the tag it annotates."
 
     _PROPERTY_TARGET_COLUMNS = frozenset((POS_TAG, ENTITY, RELATION, EVENT))
@@ -200,7 +227,8 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
     @classmethod
     def from_string(cls, header):
         """
-        Create a ColumnSpecification instance from a column specification header.
+        Create a ColumnSpecification instance from a column specification
+        header.
 
         :param header: a colspec header string
         :return: a :py:class:`.ColumnSpecification` instance
@@ -253,12 +281,12 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
         known_names = cls.NAMES
 
         for idx, name in enumerate(names):
-            cls.__getValue(colspec, idx, name, known_names)
+            cls.__get_value(colspec, idx, name, known_names)
 
         return colspec
 
     @classmethod
-    def __getValue(cls, colspec, idx, name, known_names):
+    def __get_value(cls, colspec, idx, name, known_names):
         if name.startswith('_'):
             L.warning('using an internal colspec type; probably a Bad Idea')
         if ':' in name:
@@ -286,7 +314,7 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
         self._attributes = dict()
         self._ref_targets = dict()
 
-        setUp = {
+        initialize = {
             ColumnSpecification.TOKEN: self.set_token,
             ColumnSpecification.GLOBAL_ENUM: self.set_global_enum,
             ColumnSpecification.LOCAL_ENUM: self.set_local_enum,
@@ -296,15 +324,20 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
             ColumnSpecification.EVENT:
                 lambda col: self._events.setdefault(col, None),
             ColumnSpecification.RELATION:
-                partial(self._addRelation, headers, self._relations, colspec),
+                partial(self._add_relation,
+                        headers, self._relations, colspec),
             ColumnSpecification.GLOBAL_REF:
-                partial(self._addReference, headers, self._global_refs, colspec),
+                partial(self._add_reference,
+                        headers, self._global_refs, colspec),
             ColumnSpecification.LOCAL_REF:
-                partial(self._addReference, headers, self._local_refs, colspec),
+                partial(self._add_reference,
+                        headers, self._local_refs, colspec),
             ColumnSpecification.NORMALIZATION:
-                partial(self._addProperty, self._normalizations, colspec),
+                partial(self._add_property,
+                        self._normalizations, colspec),
             ColumnSpecification.ATTRIBUTE:
-                partial(self._addProperty, self._attributes, colspec),
+                partial(self._add_property,
+                        self._attributes, colspec),
             ColumnSpecification._UNKNOWN:
                 lambda col: L.info('ignoring _UNKNOWN column %s', col + 1),
         }
@@ -312,29 +345,34 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
         for idx, coltype in enumerate(colspec):
             try:
                 # noinspection PyCallingNonCallable
-                setUp[coltype](idx)
+                initialize[coltype](idx)
             except KeyError:
-                raise ValueError(
-                    'unknown %s (%d) column %d' % (headers[idx], coltype, idx + 1)
-                )
+                raise ValueError('unknown %s (%d) column %d' % (
+                    headers[idx], coltype, idx + 1
+                ))
 
-        self.__initEvents(colspec)
+        self.__init_events(colspec)
 
-    def __initEvents(self, colspec):
+    def __init_events(self, colspec):
         for col in self._events:
-            ref_cols = tuple(reversed(tuple(self.__getReferencesBefore(colspec, col))))
+            ref_cols = tuple(reversed(tuple(
+                self.__get_references_before(colspec, col)
+            )))
             self._events[col] = (ref_cols[0], ref_cols[1:])
 
             if len(self._events[col][1]) < 1:
-                raise ValueError('EVENT column %d has less than two references' % (col + 1))
+                raise ValueError(
+                    'EVENT column %d has less than two references' % (col + 1)
+                )
 
     def __eq__(self, other):
         if not isinstance(other, ColumnSpecification):
             return False
 
-        for attr in ['_width', '_token', '_global_enum', '_local_enum', '_pos_tag',
-                     '_segment_ids', '_entities', '_events', '_relations', '_global_refs',
-                     '_local_refs', '_normalizations', '_attributes', '_ref_targets', ]:
+        for attr in ['_width', '_token', '_global_enum', '_local_enum',
+                     '_pos_tag', '_segment_ids', '_entities', '_events',
+                     '_relations', '_global_refs', '_local_refs',
+                     '_normalizations', '_attributes', '_ref_targets', ]:
             if getattr(self, attr) != getattr(other, attr):
                 return False
 
@@ -383,9 +421,13 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
         else:
             return None
 
-    def __getReferencesBefore(self, colspec, col):
+    @staticmethod
+    def __get_references_before(colspec, col):
         for idx in range(col - 1, 0, -1):
-            if colspec[idx] in (ColumnSpecification.LOCAL_REF, ColumnSpecification.GLOBAL_REF):
+            if colspec[idx] in (
+                    ColumnSpecification.LOCAL_REF,
+                    ColumnSpecification.GLOBAL_REF
+            ):
                 yield idx
             else:
                 break
@@ -474,51 +516,60 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
         elif self.is_event(col):
             return ColumnSpecification.EVENT
         else:
-            raise ValueError('column %d not a valid property target' % (col + 1))
+            raise ValueError(
+                'column %d not a valid property target' % (col + 1)
+            )
 
     def set_global_enum(self, val):
-        self._setColumn('global_enum', val)
+        self._set_column('global_enum', val)
 
     def set_local_enum(self, val):
-        self._setColumn('local_enum', val)
+        self._set_column('local_enum', val)
 
     def set_token(self, val):
-        self._setColumn('token', val)
+        self._set_column('token', val)
 
     def set_pos_tag(self, val):
-        self._setColumn('pos_tag', val)
+        self._set_column('pos_tag', val)
 
-    def _setColumn(self, name, val):
+    def _set_column(self, name, val):
         attr = '_%s' % name
         old = getattr(self, attr)
 
         if old is None:
             setattr(self, attr, int(val))
         else:
-            raise ValueError('%s already assigned to column %d' % (name.upper(), old + 1))
+            raise ValueError(
+                '%s already assigned to column %d' % (name.upper(), old + 1)
+            )
 
-    def _addRelation(self, headers, collection, colspec, col):
-        if not colspec[col - 1] in (ColumnSpecification.LOCAL_REF, ColumnSpecification.GLOBAL_REF):
+    def _add_relation(self, headers, collection, colspec, col):
+        if not colspec[col - 1] in (
+                ColumnSpecification.LOCAL_REF, ColumnSpecification.GLOBAL_REF
+        ):
             raise ValueError('RELATION column %d has no reference' % (col + 1))
 
-        self.__ensureUndefined(collection, colspec, col)
-        self.__setTargetFromHeader(headers, collection, colspec, col)
+        self.__ensure_undefined(collection, colspec, col)
+        self.__set_target_from_header(headers, collection, colspec, col)
 
-    def _addReference(self, headers, collection, colspec, col):
-        self.__ensureUndefined(collection, colspec, col)
-        self.__setTargetFromHeader(headers, collection, colspec, col)
+    def _add_reference(self, headers, collection, colspec, col):
+        self.__ensure_undefined(collection, colspec, col)
+        self.__set_target_from_header(headers, collection, colspec, col)
 
-    def _addProperty(self, collection, colspec, col):
-        self.__ensureUndefined(collection, colspec, col)
-        self.__setTarget(collection, colspec, col, ColumnSpecification._PROPERTY_TARGET_COLUMNS)
+    def _add_property(self, collection, colspec, col):
+        self.__ensure_undefined(collection, colspec, col)
+        self.__set_target(collection, colspec, col,
+                          ColumnSpecification._PROPERTY_TARGET_COLUMNS)
 
-    def __ensureUndefined(self, collection, colspec, col):
+    @staticmethod
+    def __ensure_undefined(collection, colspec, col):
         if col in collection:
             # noinspection PyUnresolvedReferences
-            raise ValueError('%s column %d already mapped' %
-                             (ColumnSpecification.INTEGERS[colspec[col]], col + 1))
+            raise ValueError('%s column %d already mapped' % (
+                ColumnSpecification.INTEGERS[colspec[col]], col + 1
+            ))
 
-    def __setTargetFromHeader(self, headers, collection, colspec, col):
+    def __set_target_from_header(self, headers, collection, colspec, col):
         header = headers[col]
 
         if ':' in header:
@@ -529,12 +580,15 @@ class ColumnSpecification(metaclass=ColumnSpecificationMetaClass):
                 collection[col] = target
             else:
                 # noinspection PyUnresolvedReferences
-                raise ValueError('target (%s) of %s column %d invalid' %
-                                 (ColumnSpecification.INTEGERS[colspec[target]], header, col + 1))
+                raise ValueError('target (%s) of %s column %d invalid' % (
+                    ColumnSpecification.INTEGERS[colspec[target]],
+                    header, col + 1
+                ))
         else:
-            self.__setTarget(collection, colspec, col, ColumnSpecification._ENTITY_COLUMNS)
+            self.__set_target(collection, colspec, col,
+                              ColumnSpecification._ENTITY_COLUMNS)
 
-    def __setTarget(self, collection, colspec, col, targets):
+    def __set_target(self, collection, colspec, col, targets):
         # noinspection PyUnresolvedReferences
         source = ColumnSpecification.INTEGERS[colspec[col]]
 
